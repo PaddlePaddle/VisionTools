@@ -15,58 +15,43 @@ limitations under the License. */
 #ifndef DATATRANSFORMER_H_
 #define DATATRANSFORMER_H_
 
-#include <iostream>
-#include <fstream>
-#include <opencv2/opencv.hpp>
-#include <vector>
-#include <string>
 #include <algorithm>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <opencv2/opencv.hpp>
+#include <string>
+#include <vector>
 
-#include "ThreadPool.h"
-#include "Queue.h"
+#define DISABLE_COPY(T) \
+  T(T&&) = delete;      \
+  T(T const&) = delete; \
+  void operator=(T const& t) = delete
+
+typedef enum { CHANNEL_MEAN = 0, ELEMENT_MEAN = 1, NULL_MEAN = 2 } MeanType;
+
+struct DataTransformerConfig {
+  bool isTest_;
+  bool isColor_;
+  int cropHeight_;
+  int cropWidth_;
+  int imgSize_;  // short side
+  MeanType meanType_;
+  float scale_;
+  int imgPixels_;  // the total pixels of transformed image
+  float* meanValues_;
+};
 
 /**
  * This is an image processing module with OpenCV, such as
  * resizing, scaling, mirroring, substracting the image mean...
- *
- * This class has a double BlockQueue and they shared the same memory.
- * It is used to avoid create memory each time. And it also can
- * return the data even if the data are processing in multi-threads.
  */
 class DataTransformer {
 public:
-  DataTransformer(int threadNum,
-                  int capacity,
-                  bool isTest,
-                  bool isColor,
-                  int cropHeight,
-                  int cropWidth,
-                  int imgSize,
-                  bool isEltMean,
-                  bool isChannelMean,
-                  float* meanValues);
-  virtual ~DataTransformer() {
-    if (meanValues_) {
-      free(meanValues_);
-    }
-  }
+  DISABLE_COPY(DataTransformer);
 
-  /**
-   * @brief Start multi-threads to transform a list of input image string.
-   *        This function reads an image from the specified buffer in the
-   *        memory.
-   * @param data   Data is the specified image buffer in the memory.
-   * @param label  The label of input image.
-   */
-  void processImgString(std::vector<std::string>& data, int* labels);
-
-  /**
-   * @brief Start multi-threads to transform a list of input image file.
-   *        This function loads image from the the specified file.
-   * @param data   Data is an list of image file.
-   * @param label  The label of input image.
-   */
-  void processImgFile(std::vector<std::string>& data, int* labels);
+  DataTransformer(std::unique_ptr<DataTransformerConfig>&& config);
+  virtual ~DataTransformer() {}
 
   /**
    * @brief Applies the transformation on one image Mat.
@@ -74,7 +59,7 @@ public:
    * @param img    The input image Mat to be transformed.
    * @param target target is used to save the transformed data.
    */
-  void transform(cv::Mat& img, float* target);
+  void transform(cv::Mat& img, float* target) const;
 
   /**
    * @brief Save image Mat as file.
@@ -82,7 +67,9 @@ public:
    * @param filename The file name.
    * @param im       The image to be saved.
    */
-  void imsave(std::string filename, cv::Mat& im) { cv::imwrite(filename, im); }
+  void imsave(std::string filename, cv::Mat& im) const {
+    cv::imwrite(filename, im);
+  }
 
   /**
    * @brief Decode the image buffer, then calls transform() function.
@@ -91,7 +78,7 @@ public:
    * @param size The length of string buffer.
    * @param trg  trg is used to save the transformed data.
    */
-  void transfromString(const char* src, const int size, float* trg);
+  void transfromString(const char* src, int size, float* trg) const;
 
   /**
    * @brief Load image form image file, then calls transform() function.
@@ -99,33 +86,10 @@ public:
    * @param src  The input image file.
    * @param trg  trg is used to save the transformed data.
    */
-  void transfromFile(std::string imgFile, float* trg);
-
-  /**
-   * @brief Return the transformed data and its label.
-   */
-  void obtain(float* data, int* label);
+  void transfromFile(const char* imgFile, float* trg) const;
 
 private:
-  int isTest_;
-  int isColor_;
-  int cropHeight_;
-  int cropWidth_;
-  int imgSize_;
-  int capacity_;
-  int fetchCount_;
-  int fetchId_;
-  bool isEltMean_;
-  bool isChannelMean_;
-  int numThreads_;
-  float scale_;
-  int imgPixels_;
-  float* meanValues_;
-
-  /**
-   * Initialize the mean values.
-   */
-  void loadMean(float* values);
+  std::unique_ptr<DataTransformerConfig> config_;
 
   /**
    * @brief Generates a random integer from Uniform({min, min + 1, ..., max}).
@@ -135,14 +99,8 @@ private:
    * @return
    * A uniformly random integer value from ({min, min + 1, ..., max}).
    */
-  int Rand(int min, int max);
+  int Rand(int min, int max) const;
 
-  typedef std::pair<float*, int> DataType;
-  typedef std::shared_ptr<DataType> DataTypePtr;
-  std::vector<DataTypePtr> prefetch_;
-  ThreadPool threadPool_;
-  std::vector<std::future<DataTypePtr>> results_;
-  BlockingQueue<DataTypePtr> prefetchQueue_;
 };  // class DataTransformer
 
 #endif  // DATATRANSFORMER_H_

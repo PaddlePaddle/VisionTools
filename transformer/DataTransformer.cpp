@@ -12,60 +12,19 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include <glog/logging.h>
 #include <time.h>
 #include <limits>
-#include <glog/logging.h>
-#include <chrono>
 
 #include "DataTransformer.h"
 
-DataTransformer::DataTransformer(int threadNum,
-                                 int capacity,
-                                 bool isTest,
-                                 bool isColor,
-                                 int cropHeight,
-                                 int cropWidth,
-                                 int imgSize,
-                                 bool isEltMean,
-                                 bool isChannelMean,
-                                 float* meanValues)
-    : isTest_(isTest),
-      isColor_(isColor),
-      cropHeight_(cropHeight),
-      cropWidth_(cropWidth),
-      imgSize_(imgSize),
-      capacity_(capacity),
-      threadPool_(threadNum),
-      prefetchQueue_(capacity) {
-  fetchCount_ = -1;
-  scale_ = 1.0;
-  isChannelMean_ = isChannelMean;
-  isEltMean_ = isEltMean;
-  loadMean(meanValues);
+DataTransformer::DataTransformer(
+    std::unique_ptr<DataTransformerConfig>&& config)
+    : config_(std::move(config)) {}
 
-  imgPixels_ = cropHeight * cropWidth * (isColor_ ? 3 : 1);
-
-  prefetch_.reserve(capacity);
-  for (int i = 0; i < capacity; i++) {
-    auto d = std::make_shared<DataType>(new float[imgPixels_ * 3], 0);
-    prefetch_.push_back(d);
-    memset(prefetch_[i]->first, 0, imgPixels_ * sizeof(float));
-    prefetchQueue_.enqueue(prefetch_[i]);
-  }
-  numThreads_ = threadNum;
-}
-
-void DataTransformer::loadMean(float* values) {
-  if (values) {
-    int c = isColor_ ? 3 : 1;
-    int sz = isChannelMean_ ? c : cropHeight_ * cropWidth_ * c;
-    meanValues_ = new float[sz];
-    memcpy(meanValues_, values, sz * sizeof(float));
-  }
-}
-
-void DataTransformer::transfromFile(std::string imgFile, float* trg) {
-  int cvFlag = (isColor_ ? CV_LOAD_IMAGE_COLOR : CV_LOAD_IMAGE_GRAYSCALE);
+void DataTransformer::transfromFile(const char* imgFile, float* trg) const {
+  int cvFlag =
+      config_->isColor_ ? CV_LOAD_IMAGE_COLOR : CV_LOAD_IMAGE_GRAYSCALE;
   try {
     cv::Mat im = cv::imread(imgFile, cvFlag);
     if (!im.data) {
@@ -79,11 +38,12 @@ void DataTransformer::transfromFile(std::string imgFile, float* trg) {
 }
 
 void DataTransformer::transfromString(const char* src,
-                                      const int size,
-                                      float* trg) {
+                                      int size,
+                                      float* trg) const {
   try {
     cv::_InputArray imbuf(src, size);
-    int cvFlag = (isColor_ ? CV_LOAD_IMAGE_COLOR : CV_LOAD_IMAGE_GRAYSCALE);
+    int cvFlag =
+        config_->isColor_ ? CV_LOAD_IMAGE_COLOR : CV_LOAD_IMAGE_GRAYSCALE;
     cv::Mat im = cv::imdecode(imbuf, cvFlag);
     if (!im.data) {
       LOG(ERROR) << "Could not decode image";
@@ -95,56 +55,55 @@ void DataTransformer::transfromString(const char* src,
   }
 }
 
-int DataTransformer::Rand(int min, int max) {
-  std::random_device source;
-  std::mt19937 rng(source());
+int DataTransformer::Rand(int min, int max) const {
+  std::mt19937 rng(time(0));
   std::uniform_int_distribution<int> dist(min, max);
   return dist(rng);
 }
 
-void DataTransformer::transform(cv::Mat& cvImgOri, float* target) {
+void DataTransformer::transform(cv::Mat& cvImgOri, float* target) const {
   const int imgChannels = cvImgOri.channels();
   const int imgHeight = cvImgOri.rows;
   const int imgWidth = cvImgOri.cols;
-  const bool doMirror = (!isTest_) && Rand(0, 1);
-  int h_off = 0;
-  int w_off = 0;
+  const bool doMirror = (!config_->isTest_) && Rand(0, 1);
+  int hoff = 0;
+  int woff = 0;
   int th = imgHeight;
   int tw = imgWidth;
   cv::Mat img;
-  if (imgSize_ > 0) {
-    if (imgHeight > imgWidth) {
-      tw = imgSize_;
-      th = int(double(imgHeight) / imgWidth * tw);
-      th = th > imgSize_ ? th : imgSize_;
-    } else {
-      th = imgSize_;
-      tw = int(double(imgWidth) / imgHeight * th);
-      tw = tw > imgSize_ ? tw : imgSize_;
-    }
+  int imsz = config_->imgSize_;
+  if (imsz > 0) {
+    double ratio = imgHeight < imgWidth ? double(imsz) / double(imgHeight)
+                                        : double(imsz) / double(imgWidth);
+    th = int(double(imgHeight) * ratio);
+    tw = int(double(imgWidth) * ratio);
     cv::resize(cvImgOri, img, cv::Size(tw, th));
   } else {
-    cv::Mat img = cvImgOri;
+    img = cvImgOri;
   }
 
   cv::Mat cv_cropped_img = img;
-  if (cropHeight_ && cropWidth_) {
-    if (!isTest_) {
-      h_off = Rand(0, th - cropHeight_);
-      w_off = Rand(0, tw - cropWidth_);
+  int cropH = config_->cropHeight_;
+  int cropW = config_->cropWidth_;
+  if (cropH && cropW) {
+    if (!config_->isTest_) {
+      hoff = Rand(0, th - cropH);
+      woff = Rand(0, tw - cropW);
     } else {
-      h_off = (th - cropHeight_) / 2;
-      w_off = (tw - cropWidth_) / 2;
+      hoff = (th - cropH) / 2;
+      woff = (tw - cropW) / 2;
     }
-    cv::Rect roi(w_off, h_off, cropWidth_, cropHeight_);
+    cv::Rect roi(woff, hoff, cropW, cropH);
     cv_cropped_img = img(roi);
   } else {
-    CHECK_EQ(cropHeight_, imgHeight);
-    CHECK_EQ(cropWidth_, imgWidth);
+    CHECK_EQ(cropH, imgHeight);
+    CHECK_EQ(cropW, imgWidth);
   }
-  int height = cropHeight_;
-  int width = cropWidth_;
+  int height = cropH;
+  int width = cropW;
   int top_index;
+  float scale = config_->scale_;
+  float* meanVal = config_->meanValues_;
   for (int h = 0; h < height; ++h) {
     const uchar* ptr = cv_cropped_img.ptr<uchar>(h);
     int img_index = 0;
@@ -156,61 +115,24 @@ void DataTransformer::transform(cv::Mat& cvImgOri, float* target) {
           top_index = (c * height + h) * width + w;
         }
         float pixel = static_cast<float>(ptr[img_index++]);
-        if (isEltMean_) {
-          int mean_index = (c * imgHeight + h) * imgWidth + w;
-          target[top_index] = (pixel - meanValues_[mean_index]) * scale_;
-        } else {
-          if (isChannelMean_) {
-            target[top_index] = (pixel - meanValues_[c]) * scale_;
-          } else {
-            target[top_index] = pixel * scale_;
+        switch (config_->meanType_) {
+          case CHANNEL_MEAN: {
+            target[top_index] = (pixel - meanVal[c]) * scale;
+            break;
           }
+          case ELEMENT_MEAN: {
+            int mean_index = (c * height + h) * width + w;
+            target[top_index] = (pixel - meanVal[mean_index]) * scale;
+            break;
+          }
+          case NULL_MEAN: {
+            target[top_index] = pixel * scale;
+            break;
+          }
+          default:
+            LOG(FATAL) << "Unsupport type";
         }
       }
     }
   }  // target: BGR
-}
-
-void DataTransformer::processImgString(std::vector<std::string>& data,
-                                       int* labels) {
-  results_.clear();
-  for (size_t i = 0; i < data.size(); ++i) {
-    results_.emplace_back(threadPool_.enqueue([this, &data, labels, i]() {
-      DataTypePtr ret = this->prefetchQueue_.dequeue();
-      std::string buf = data[i];
-      int size = buf.length();
-      ret->second = labels[i];
-      this->transfromString(buf.c_str(), size, ret->first);
-      return ret;
-    }));
-  }
-  fetchCount_ = data.size();
-  fetchId_ = 0;
-}
-
-void DataTransformer::processImgFile(std::vector<std::string>& data,
-                                     int* labels) {
-  results_.clear();
-  for (size_t i = 0; i < data.size(); ++i) {
-    results_.emplace_back(threadPool_.enqueue([this, &data, labels, i]() {
-      DataTypePtr ret = this->prefetchQueue_.dequeue();
-      std::string file = data[i];
-      ret->second = labels[i];
-      this->transfromFile(file, ret->first);
-      return ret;
-    }));
-  }
-  fetchCount_ = data.size();
-  fetchId_ = 0;
-}
-
-void DataTransformer::obtain(float* data, int* label) {
-  if (fetchId_ >= fetchCount_) {
-    LOG(FATAL) << "Empty data";
-  }
-  DataTypePtr ret = results_[fetchId_].get();
-  *label = ret->second;
-  memcpy(data, ret->first, sizeof(float) * imgPixels_);
-  prefetchQueue_.enqueue(ret);
-  ++fetchId_;
 }

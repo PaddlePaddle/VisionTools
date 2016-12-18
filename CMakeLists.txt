@@ -14,4 +14,6 @@ include_directories(${PYTHON_INCLUDE_DIR})
 include_directories(${LIBGLOG_INCLUDE_DIR})
 include_directories(${PYTHON_NUMPY_INCLUDE_DIR})
 
+enable_testing()
+
 add_subdirectory(transformer)

@@ -13,11 +13,12 @@ if (Boost_NO_SYSTEM_PATHS)
   set(Boost_INCLUDE_DIR "${BOOST_ROOT}/include")
   set(Boost_LIBRARIES "${BOOST_ROOT}/lib/")
 endif (Boost_NO_SYSTEM_PATHS)
-find_package(Boost 1.46 COMPONENTS python)
+find_package(Boost 1.63 COMPONENTS python numpy)
 include_directories(${Boost_INCLUDE_DIR})
 
 list(APPEND DEJPEG_LINKER_LIBS ${OpenCV_LIBS})
 list(APPEND DEJPEG_LINKER_LIBS ${Boost_LIBRARIES})
+list(APPEND DEJPEG_LINKER_LIBS ${LIBGLOG_LIBRARY})
 
 set(DEJPEG_SOURCES 
     DataTransformer.cpp
@@ -27,3 +28,5 @@ add_library(DeJpeg SHARED ${DEJPEG_SOURCES})
 target_compile_options(DeJpeg BEFORE PRIVATE ${BUILD_FLAGS})
 target_link_libraries(DeJpeg ${DEJPEG_LINKER_LIBS})
 set_target_properties(DeJpeg PROPERTIES PREFIX "")
+
+add_subdirectory(tests)
