@@ -28,7 +28,7 @@ limitations under the License. */
   T(T const&) = delete; \
   void operator=(T const& t) = delete
 
-typedef enum { CHANNEL_MEAN = 0, ELEMENT_MEAN = 1, NULL_MEAN = 2 } MeanType;
+enum MeanType { CHANNEL_MEAN = 0, ELEMENT_MEAN = 1, NULL_MEAN = 2 };
 
 struct DataTransformerConfig {
   bool isTest_;

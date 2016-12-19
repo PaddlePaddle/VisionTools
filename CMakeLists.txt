@@ -7,9 +7,10 @@ include(flags)
 
 find_package(PythonLibs 2.7 REQUIRED)
 find_package(PythonInterp 2.7 REQUIRED)
-find_package(Glog)
+find_package(Glog REQUIRED)
 find_package(NumPy REQUIRED)
 
+include_directories(${PROJ_ROOT})
 include_directories(${PYTHON_INCLUDE_DIR})
 include_directories(${LIBGLOG_INCLUDE_DIR})
 include_directories(${PYTHON_NUMPY_INCLUDE_DIR})

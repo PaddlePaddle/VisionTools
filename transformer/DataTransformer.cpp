@@ -56,11 +56,13 @@ void DataTransformer::transfromString(const char* src,
 }
 
 int DataTransformer::Rand(int min, int max) const {
-  std::mt19937 rng(time(0));
+  std::default_random_engine eng;
   std::uniform_int_distribution<int> dist(min, max);
-  return dist(rng);
+  return dist(eng);
 }
 
+// TODO(qingqing): add more data argumentation operation
+// and split this function.
 void DataTransformer::transform(cv::Mat& cvImgOri, float* target) const {
   const int imgChannels = cvImgOri.channels();
   const int imgHeight = cvImgOri.rows;

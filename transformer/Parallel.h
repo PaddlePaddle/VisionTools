@@ -20,7 +20,7 @@ limitations under the License. */
 #include <vector>
 
 #include "DataTransformer.h"
-#include "ThreadPool.h"
+#include "third_party/thread/ThreadPool.h"
 
 namespace bn = boost::python::numpy;
 
@@ -35,7 +35,7 @@ public:
            PyObject* meanValues)
       : threadPool_(threadNum) {
     int channel = isColor ? 3 : 1;
-    MeanType meanType;
+    MeanType meanType = NULL_MEAN;
     float* mean = NULL;
     if (meanValues || meanValues != Py_None) {
       if (!PyArray_Check(meanValues)) {
@@ -44,7 +44,7 @@ public:
       pyTypeCheck(meanValues);
       int size = PyArray_SIZE(reinterpret_cast<PyArrayObject*>(meanValues));
       mean = (float*)PyArray_DATA(reinterpret_cast<PyArrayObject*>(meanValues));
-      meanType = (size == channel) ? CHANNEL_MEAN : NULL_MEAN;
+      meanType = (size == channel) ? CHANNEL_MEAN : meanType;
       meanType =
           (size == channel * cropSizeH * cropSizeW) ? ELEMENT_MEAN : meanType;
     }
@@ -124,20 +124,6 @@ private:
     if (type < 0) {
       LOG(FATAL) << "toMat: Data type = " << type << " is not supported";
     }
-  }
-
-  /**
-   * @brief Check whether the PyObject is writable or not.
-   */
-  void pyWritableCheck(PyObject* o) {
-    CHECK(PyArray_ISWRITEABLE(reinterpret_cast<PyArrayObject*>(o)));
-  }
-
-  /**
-   * @brief Check whether the PyObject is c-contiguous or not.
-   */
-  void pyContinuousCheck(PyObject* o) {
-    CHECK(PyArray_IS_C_CONTIGUOUS(reinterpret_cast<PyArrayObject*>(o)));
   }
 
   int imgPixels_;
