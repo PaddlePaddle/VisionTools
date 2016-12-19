@@ -55,7 +55,7 @@ void DataTransformer::transfromString(const char* src,
   }
 }
 
-int DataTransformer::Rand(int min, int max) const {
+int DataTransformer::rand(int min, int max) const {
   std::default_random_engine eng;
   std::uniform_int_distribution<int> dist(min, max);
   return dist(eng);
@@ -67,7 +67,7 @@ void DataTransformer::transform(cv::Mat& cvImgOri, float* target) const {
   const int imgChannels = cvImgOri.channels();
   const int imgHeight = cvImgOri.rows;
   const int imgWidth = cvImgOri.cols;
-  const bool doMirror = (!config_->isTest_) && Rand(0, 1);
+  const bool doMirror = (!config_->isTest_) && rand(0, 1);
   int hoff = 0;
   int woff = 0;
   int th = imgHeight;
@@ -89,8 +89,8 @@ void DataTransformer::transform(cv::Mat& cvImgOri, float* target) const {
   int cropW = config_->cropWidth_;
   if (cropH && cropW) {
     if (!config_->isTest_) {
-      hoff = Rand(0, th - cropH);
-      woff = Rand(0, tw - cropW);
+      hoff = rand(0, th - cropH);
+      woff = rand(0, tw - cropW);
     } else {
       hoff = (th - cropH) / 2;
       woff = (tw - cropW) / 2;

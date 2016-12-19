@@ -99,7 +99,7 @@ private:
    * @return
    * A uniformly random integer value from ({min, min + 1, ..., max}).
    */
-  int Rand(int min, int max) const;
+  int rand(int min, int max) const;
 
 };  // class DataTransformer
 
