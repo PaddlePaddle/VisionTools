@@ -59,7 +59,7 @@ public:
    * @param img    The input image Mat to be transformed.
    * @param target target is used to save the transformed data.
    */
-  void transform(cv::Mat& img, float* target) const;
+  void transform(cv::Mat& img, float* target);
 
   /**
    * @brief Save image Mat as file.
@@ -78,7 +78,7 @@ public:
    * @param size The length of string buffer.
    * @param trg  trg is used to save the transformed data.
    */
-  void transfromString(const char* src, int size, float* trg) const;
+  void transfromString(const char* src, const int size, float* trg);
 
   /**
    * @brief Load image form image file, then calls transform() function.
@@ -86,7 +86,7 @@ public:
    * @param src  The input image file.
    * @param trg  trg is used to save the transformed data.
    */
-  void transfromFile(const char* imgFile, float* trg) const;
+  void transfromFile(const char* imgFile, float* trg);
 
 private:
   std::unique_ptr<DataTransformerConfig> config_;
@@ -99,7 +99,8 @@ private:
    * @return
    * A uniformly random integer value from ({min, min + 1, ..., max}).
    */
-  int rand(int min, int max) const;
+  int rand(const int min, const int max);
+  std::default_random_engine eng_;
 
 };  // class DataTransformer
 

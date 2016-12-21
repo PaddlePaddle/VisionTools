@@ -20,50 +20,39 @@ limitations under the License. */
 
 DataTransformer::DataTransformer(
     std::unique_ptr<DataTransformerConfig>&& config)
-    : config_(std::move(config)) {}
+    : config_(std::move(config)), eng_(time(NULL)) {}
 
-void DataTransformer::transfromFile(const char* imgFile, float* trg) const {
+void DataTransformer::transfromFile(const char* imgFile, float* trg) {
   int cvFlag =
       config_->isColor_ ? CV_LOAD_IMAGE_COLOR : CV_LOAD_IMAGE_GRAYSCALE;
-  try {
-    cv::Mat im = cv::imread(imgFile, cvFlag);
-    if (!im.data) {
-      LOG(ERROR) << "Could not decode image";
-      LOG(ERROR) << im.channels() << " " << im.rows << " " << im.cols;
-    }
-    this->transform(im, trg);
-  } catch (cv::Exception& e) {
-    LOG(ERROR) << "Caught exception in cv::imdecode " << e.msg;
+  cv::Mat im = cv::imread(imgFile, cvFlag);
+  if (!im.data) {
+    LOG(FATAL) << "Could not read image, image shape";
   }
+  this->transform(im, trg);
 }
 
 void DataTransformer::transfromString(const char* src,
-                                      int size,
-                                      float* trg) const {
-  try {
-    cv::_InputArray imbuf(src, size);
-    int cvFlag =
-        config_->isColor_ ? CV_LOAD_IMAGE_COLOR : CV_LOAD_IMAGE_GRAYSCALE;
-    cv::Mat im = cv::imdecode(imbuf, cvFlag);
-    if (!im.data) {
-      LOG(ERROR) << "Could not decode image";
-      LOG(ERROR) << im.channels() << " " << im.rows << " " << im.cols;
-    }
-    this->transform(im, trg);
-  } catch (cv::Exception& e) {
-    LOG(ERROR) << "Caught exception in cv::imdecode " << e.msg;
+                                      const int size,
+                                      float* trg) {
+  cv::_InputArray imbuf(src, size);
+  int cvFlag =
+      config_->isColor_ ? CV_LOAD_IMAGE_COLOR : CV_LOAD_IMAGE_GRAYSCALE;
+  cv::Mat im = cv::imdecode(imbuf, cvFlag);
+  if (!im.data) {
+    LOG(FATAL) << "Could not decode image";
   }
+  this->transform(im, trg);
 }
 
-int DataTransformer::rand(int min, int max) const {
-  std::default_random_engine eng;
+int DataTransformer::rand(const int min, const int max) {
   std::uniform_int_distribution<int> dist(min, max);
-  return dist(eng);
+  return dist(eng_);
 }
 
 // TODO(qingqing): add more data argumentation operation
 // and split this function.
-void DataTransformer::transform(cv::Mat& cvImgOri, float* target) const {
+void DataTransformer::transform(cv::Mat& cvImgOri, float* target) {
   const int imgChannels = cvImgOri.channels();
   const int imgHeight = cvImgOri.rows;
   const int imgWidth = cvImgOri.cols;
@@ -107,7 +96,7 @@ void DataTransformer::transform(cv::Mat& cvImgOri, float* target) const {
   float scale = config_->scale_;
   float* meanVal = config_->meanValues_;
   for (int h = 0; h < height; ++h) {
-    const uchar* ptr = cv_cropped_img.ptr<uchar>(h);
+    const uint8_t* ptr = cv_cropped_img.ptr<uint8_t>(h);
     int img_index = 0;
     for (int w = 0; w < width; ++w) {
       for (int c = 0; c < imgChannels; ++c) {
