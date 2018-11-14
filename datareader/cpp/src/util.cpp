@@ -4,7 +4,7 @@
 #include "logger.h"
 #include "util.h"
 
-namespace vis {
+namespace vistool {
 
 int int_rand_range(int min, int max) {
     if (min > max) {
@@ -104,7 +104,6 @@ bool BufLogger::append(const char* fmt, ...) {
         return false;
     }
 }
-
-};// end of namespace 'vis'
+};// end of namespace 'vistool'
 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

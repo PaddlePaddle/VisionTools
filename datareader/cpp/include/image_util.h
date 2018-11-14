@@ -9,7 +9,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-namespace vis {
+namespace vistool {
 
 // error code for processed image
 enum IMPROC_ERR_CODE_TYPE {
@@ -23,7 +23,7 @@ int read_image(const std::string &fname, std::vector<char> &buf);
 
 int save_image(const cv::Mat &img, const std::string &fname);
 
-IMPROC_ERR_CODE_TYPE decode_image(const std::vector<char> &img,
+IMPROC_ERR_CODE_TYPE decode_image(const char *buf, size_t bufsize,
         cv::Mat &result, int mode = cv::IMREAD_UNCHANGED);
 
 IMPROC_ERR_CODE_TYPE resize_image(const cv::Mat &img, const cv::Size &size,
@@ -39,7 +39,7 @@ IMPROC_ERR_CODE_TYPE rotate_image(const cv::Mat &img,
 IMPROC_ERR_CODE_TYPE flip_image(
         const cv::Mat &img, int flip_code, cv::Mat &result);
 
-};//end of namespace 'vis'
+};//end of namespace 'vistool'
 
 #endif  //__IMAGE_UTIL_H_
 

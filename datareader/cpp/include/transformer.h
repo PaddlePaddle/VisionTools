@@ -9,14 +9,14 @@
 #include <string>
 #include <vector>
 
-namespace vis {
+namespace vistool {
 
 typedef std::map<std::string, std::string > kv_conf_t;
 typedef std::map<std::string, std::string >::iterator kv_conf_iter_t;
 typedef std::map<std::string, std::string >::const_iterator kv_conf_const_iter_t;
 
 struct transformer_input_data_t {
-    transformer_input_data_t() : id(0){}
+    transformer_input_data_t() : id(0) {}
     unsigned int id;
     std::vector<char> data;
     std::string label;
@@ -50,6 +50,15 @@ enum TRANSFORMER_ERR_CODE_TYPE {
     TRANS_ERR_FLIP_INVALID_PARAM = 1010,
 };
 
+/**
+ * @brief base class to abstract the transformation on multiple type of data sample,
+ *        eg: image/video/audio
+ *        processing steps:
+ *        1, configure worker number, queue length
+ *        2, configure operations needed to be applied on data samples
+ *        3, launch this transformer
+ *        4, feed data sample and fetch results
+ */
 class Transformer {
 public:
     Transformer();
@@ -99,10 +108,14 @@ public:
      * get a transformed image from this transformer
      */
     virtual int get(transformer_output_data_t &output) = 0;
+
+    /*
+     * put a new image processing task to this transformer
+     */
+    virtual int put(int id, const char *image, int image_len, 
+        const char *label="", int label_len=0) = 0;
 };
-
-};// end of namespace 'vis'
-
+};// end of namespace 'vistool'
 #endif  //__TRANSFORMER_H_
 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

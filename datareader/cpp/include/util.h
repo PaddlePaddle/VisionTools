@@ -5,7 +5,7 @@
 #include <vector>
 #include <stdint.h>
 
-namespace vis {
+namespace vistool {
 
 int int_rand_range(int min, int max);
 
@@ -35,8 +35,7 @@ private:
     bool _log_out;
     std::string _buffer;
 };
-
-};// end of namespace "vis"
+};// end of namespace "vistool"
 
 #endif  //__UTIL_H_
 

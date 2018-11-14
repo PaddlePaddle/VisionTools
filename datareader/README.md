@@ -14,23 +14,8 @@ Usually this pipeline includes data operations like `load/parse/decode/resize/cr
 ---
 ### How to install
 
-  * compile dependent libs
-    * opencv2
-    * libjpeg-turbo 
-    * glog
+  * build wheel
+    `mkdir output && cd output && cmake .. && make`
 
-  * prepare libs
-    * `cp -r /path/to/compiled/glog ./datareader/thirdlibs/glob`
-    * `cp -r /path/to/compiled/opencv2 ./datareader/thirdlibs/opencv`
-    * `cp -r /path/to/compiled/libjpeg-turbo ./datareader/thirdlibs/libjpeg-turbo`
-
-  * install datareader
-    * `python ./setup.py install`
-
----
-### other infos
-
-  * jpeg-turbo
-    * source: https://github.com/libjpeg-turbo/libjpeg-turbo.git
-    * commit 43e84cff1bb2bd8293066f6ac4eb0df61ddddbc6
-    * `cmake -DCMAKE_C_FLAGS_RELEASE="-fPIC" -DWITH_JPEG8=1  -D CMAKE_BUILD_TYPE=RELEASE -D CMAKE_INSTALL_PREFIX=/sharefolder/turbojpeg ..`
+  * install wheel
+    `python install output/dist/datareader-0.0.1-cp27-cp27mu-linux_x86_64.whl`

@@ -11,25 +11,31 @@ from setuptools import find_packages
 from distutils.extension import Extension
 from Cython.Distutils import build_ext
 
-
-if '--turbojpeg=no' in sys.argv:
-    sys.argv.remove('--turbojpeg=no')
-    use_turbojpeg = False
-else:
-    use_turbojpeg = True
-
+print("### build datareader wheel with args:%s" % (' '.join(sys.argv)))
 curfolder = os.path.dirname(os.path.abspath(__file__))
 cpp_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cpp')
+use_turbojpeg = True
+if os.environ.get('USE_TURBO_JPEG', '') == '0':
+    use_turbojpeg = False
 
-#make sure the dependent third libs are all ready in 'thirdlibs/'
-opencvincludedir = os.path.join(curfolder, 'thirdlibs/opencv/include')
-opencvlibdir = os.path.join(curfolder, 'thirdlibs/opencv/lib')
-pythonlibdir = os.path.join(curfolder, 'thirdlibs/python27/lib')
-jpegturboincludedir = os.path.join(curfolder, 'thirdlibs/libjpeg-turbo/include')
-jpegturbolibdir = os.path.join(curfolder, 'thirdlibs/libjpeg-turbo/lib')
-    
+third_libs = os.environ.get('THIRD_LIBS_INSTALL_PATH', 'third_party')
+if third_libs == 'third_party':
+    third_libs = os.path.join(curfolder, third_libs)
+
+opencvincludedir = os.path.join(third_libs, 'opencv/include')
+opencvlibdir = os.path.join(third_libs, 'opencv/lib')
+jpegturboincludedir = os.path.join(third_libs, 'turbojpeg/include')
+jpegturbolibdir = os.path.join(third_libs, 'turbojpeg/lib')
+
+pythonlibdir = os.environ.get('PYTHON_LIBRARIES', '')
+if pythonlibdir == '':
+    pythonlibdir = os.path.join(third_libs, 'python27/lib')
+else:
+    if os.path.isfile(pythonlibdir):
+        pythonlibdir = os.path.dirname(pythonlibdir)
+
 opencvlibs = [
-    'opencv_world', "IlmImf", "ippicv", "ippiw", "ittnotify", "libjasper",
+    "opencv_world", "IlmImf", "ittnotify", "libjasper",
     "libpng", "libtiff", "libwebp", "zlib"
 ]
 
@@ -77,8 +83,8 @@ lib_modname = modname + '.transformer.libpytransform'
 pyxfile = os.path.join(cpp_root, 'libpytransform.pyx')
 extensions = [make_transform_ext(lib_modname, pyxfile, cpp_root)]
 
-pysource = 'python'
 #build package of datareader
+pysource = 'python'
 setup(name=modname,
     version=version,
     description="a package for data loading and preprocessing in training model",

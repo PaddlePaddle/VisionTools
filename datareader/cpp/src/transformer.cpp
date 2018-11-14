@@ -2,7 +2,7 @@
 #include "image_transformer.h"
 #include "logger.h"
 
-namespace vis {
+namespace vistool {
 
 Transformer::Transformer() {
 }
@@ -29,7 +29,6 @@ void Transformer::destroy(Transformer *t) {
         delete t;
     }
 }
-
-};// end of namespace 'vis'
+};// end of namespace 'vistool'
 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

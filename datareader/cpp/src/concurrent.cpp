@@ -3,7 +3,7 @@
 #include "logger.h"
 #include "util.h"
 
-namespace vis {
+namespace vistool {
 
 ITask::ITask(): 
     _finished(false),

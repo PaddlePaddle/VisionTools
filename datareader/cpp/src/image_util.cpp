@@ -8,8 +8,17 @@
 #ifdef USETURBOJPEG 
 #include "turbojpeg.h"
 #endif
-namespace vis {
 
+namespace vistool {
+
+/**
+ * @brief read data from file
+ *
+ * Returns:
+ *  0:  if succeed
+ *  -1: failed to open file
+ *  -2: failed to read
+ */
 int read_image(const std::string &fname, std::vector<char> &buf) {
     buf.clear();
 
@@ -36,6 +45,14 @@ int read_image(const std::string &fname, std::vector<char> &buf) {
     return 0;
 }
 
+/**
+ * @brief save image in 'img' to file 'fname'
+ *
+ * Returns:
+ *  0: if succeed
+ *  -1: no data in 'img'
+ *  -2: failed to write data to file
+ */
 int save_image(const cv::Mat &img, const std::string &fname) {
     if (img.empty()) {
         return -1;
@@ -57,7 +74,6 @@ int save_image(const cv::Mat &img, const std::string &fname) {
     
 #ifdef USETURBOJPEG 
 static cv::Mat jpgdecode(const char * buffer, int bufferlen, int iscolor) {
-    
     tjhandle handle = tjInitDecompress();
 
     int width = 0;
@@ -81,7 +97,7 @@ static cv::Mat jpgdecode(const char * buffer, int bufferlen, int iscolor) {
     return img;
 }
 
-static bool checkformat(const char * buffer, int bufferlen,
+static bool checkformat(const char *buffer, int bufferlen,
     const char *format, int comparelen){
     if (bufferlen < comparelen){
         return false;
@@ -95,20 +111,19 @@ static bool is_jpeg_format(const char * buffer, int bufferlen) {
 }
 #endif    
 
-IMPROC_ERR_CODE_TYPE decode_image(const std::vector<char> &buf,
-    cv::Mat &result, int mode) {
+IMPROC_ERR_CODE_TYPE decode_image(const char *buf, size_t bufsize, 
+        cv::Mat &result, int mode) {
     IMPROC_ERR_CODE_TYPE ret = IMPROC_OK;
     cv::Mat dec;
 #ifdef USETURBOJPEG
-    bool isjpeg = is_jpeg_format(buf.data(), buf.size());
+    bool isjpeg = is_jpeg_format(buf, bufsize);
     if (isjpeg){  
-        dec = jpgdecode(buf.data(), buf.size(), mode);
-    }
-    else{
-        dec = cv::imdecode(buf, mode);
+        dec = jpgdecode(buf, bufsize, mode);
+    } else {
+        dec = cv::imdecode(std::vector<char>(buf, buf + bufsize), mode);
     }
 #else
-    dec = cv::imdecode(buf, mode);
+    dec = cv::imdecode(std::vector<char>(buf, buf + bufsize), mode);
 #endif //USETURBOJPEG 
     
     if (dec.channels() == 3) {
@@ -168,6 +183,6 @@ IMPROC_ERR_CODE_TYPE flip_image(
     return ret;
 }
 
-};//end of namespace 'vis'
+};//end of namespace 'vistool'
 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

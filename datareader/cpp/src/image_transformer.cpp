@@ -8,7 +8,7 @@
 #include <iostream>
 #include <cstring>
 
-namespace vis {
+namespace vistool {
 
 class MyTask : public ITask {
 public:
@@ -16,6 +16,10 @@ public:
             const transformer_input_data_t &input,
             ImageTransformer *t) {
         return new MyTask(input, t);
+    }
+
+    static MyTask *create(ImageTransformer *t) {
+        return new MyTask(t);
     }
 
     static void destroy(MyTask *task) {
@@ -29,15 +33,23 @@ public:
         MyTask::destroy(this);
     }
 
+    transformer_input_data_t *get_input() {
+        return &this->_input;
+    }
+
 private:
     MyTask(const transformer_input_data_t &input,
         ImageTransformer *t)
         : _input(input),
-        _transformer(t) {}
+          _transformer(t) {}
+
+    MyTask(ImageTransformer *t)
+        : _transformer(t) {}
+
     virtual ~MyTask() {}
 
 private:
-    const transformer_input_data_t _input;
+    transformer_input_data_t _input;
     ImageTransformer *_transformer;
 };
 
@@ -501,18 +513,42 @@ bool ImageTransformer::is_stopped() {
 }
 
 int ImageTransformer::put(const transformer_input_data_t &input) {
+    MyTask *t = MyTask::create(input, this);
+    int ret = this->_put_task(t);
+    if (ret) {
+        MyTask::destroy(t);
+    }
+    return ret;
+}
+
+int ImageTransformer::put(int id, const char *image, int image_len, 
+    const char *label, int label_len) {
+    MyTask *t = MyTask::create(this);
+    transformer_input_data_t *input = t->get_input();
+    input->id = id;
+    input->data.resize(image_len);
+    memcpy(&input->data[0], image, image_len);
+    input->label.resize(label_len);
+    memcpy(&input->label[0], label, label_len);
+
+    int ret = this->_put_task(t);
+    if (ret) {
+        MyTask::destroy(t);
+    }
+    return ret;
+}
+
+int ImageTransformer::_put_task(ITask *t) {
     if (this->_state != "started") {
         LOG(WARNING) << "not allowed to put input in this state["
             << this->_state << "]";
         return -1;
     }
 
-    MyTask *t = MyTask::create(input, this);
     int ret = this->_workers.append_task(t);
 
     if (ret) {
         LOG(FATAL) << "failed to append task to transformer";
-        MyTask::destroy(t);
         ret = -2;
     } else {
         _in_num++;
@@ -564,8 +600,10 @@ void ImageTransformer::process(const transformer_input_data_t &input) {
     std::string err_msg = "";
     cv::Mat result;
 
+    const char *input_img = &input.data[0];
+    size_t input_len = input.data.size();
     BufLogger logger;
-    logger.append("[process][input:{id:%d,size:%d}]", input.id, input.data.size());
+    logger.append("[process][input:{id:%d,size:%d}]", input.id, input_len);
 
     transformer_output_data_t *output = new transformer_output_data_t;
     output->id = input.id;
@@ -581,7 +619,7 @@ void ImageTransformer::process(const transformer_input_data_t &input) {
                 int mode = 0;
                 conf.get("mode", mode, cv::IMREAD_UNCHANGED);
                 logger.append("[mode:%d]", mode);
-                err_no = decode_image(input.data, result, mode);
+                err_no = decode_image(input_img, input_len, result, mode);
             } else {
                 cv::Mat in = result;
                 result = cv::Mat();
@@ -628,7 +666,7 @@ void ImageTransformer::process(const transformer_input_data_t &input) {
             std::memcpy(&output->data[0], result.data, size);
         }
     } else {
-        output->data.assign(&input.data[0], input.data.size());
+        output->data.assign(input_img, input_len);
     }
 
     logger.append("[output:{size:%d,err_no:%d,err_msg:[%s]}]",
@@ -638,6 +676,6 @@ void ImageTransformer::process(const transformer_input_data_t &input) {
     return;
 }
 
-}; // end of namespace 'vis'
+}; // end of namespace 'vistool'
 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

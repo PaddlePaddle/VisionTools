@@ -27,6 +27,8 @@ class Operator(object):
         pass
 
     def execute(self, *args, **kwargs):
+        """ execute the transformation plan defined by this op
+        """
         return self._execute(*args, **kwargs)
 
     def _execute(self, *args, **kwargs):
@@ -34,6 +36,9 @@ class Operator(object):
             % (type(self).__name__))
 
     def make_plan(self, builder):
+        """ register the transformation plan to 'builder' which
+            can be used to create an accelerated pipeline of transformations
+        """
         return self._make_plan(builder)
 
     def _make_plan(self, builder):

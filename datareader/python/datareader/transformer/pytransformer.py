@@ -142,6 +142,7 @@ class Builder(object):
         """
         if type(size) is int:
             size = (size, size)
+
         conf = {
                 "crop_center": str(1 if center else 0),
                 "crop_w": str(size[0]), "crop_h": str(size[1]),
@@ -160,6 +161,9 @@ class Builder(object):
         Return:
             self
         """
+        if type(size) is int:
+            size = (size, size)
+
         scale = [0.08, 1.0] if scale is None else scale
         ratio = [3. / 4., 4. / 3.] if ratio is None else ratio
 

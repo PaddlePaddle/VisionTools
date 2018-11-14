@@ -14,8 +14,11 @@
 #include <mutex>
 #include <condition_variable>
 
-namespace vis {
+namespace vistool {
 
+/**
+ * @brief a thread-safe blocking queue which implements producer-consumer pattern
+ */
 template<typename T>
 class BlockingQueue {
 public:
@@ -40,6 +43,12 @@ public:
         return _queue.size();
     }
 
+    /**
+     * @brief get an element from this queue, which will be timed out 
+     *        if 'wait_ms' is greater than 0
+     *
+     * Return the element if succeed, otherwise NULL
+     */
     T get(uint32_t wait_ms = 0) {
         std::unique_lock<std::mutex> lock(_mutex);
         bool cond_meet = false;
@@ -68,7 +77,11 @@ public:
         return ele;
     }
 
-    int get(T &res) {
+    /**
+     * @brief get an element from this queue, which maybe blocked forever
+     *        if no element is available
+     */
+    void get(T &res) {
         std::unique_lock<std::mutex> lock(_mutex);
 
         _cond.wait(lock, [this](){
@@ -79,9 +92,12 @@ public:
 
         lock.unlock();
         _cond.notify_all();
-        return 0;
+        return;
     }
 
+    /**
+     * @brief put an element to this queue
+     */
     void put(const T &ele) {
         std::unique_lock<std::mutex> lock(_mutex);
 
@@ -105,6 +121,9 @@ private:
 
 typedef void (*task_cb_t)(void *arg);
 
+/**
+ * @brief task interface which represents a job processed by class 'ThreadPool'
+ */
 class ITask {
 public:
     ITask();
@@ -142,7 +161,10 @@ private:
     int _result;
 };
 
-//a class provide one queue and mutiple consumers
+/** 
+ * @brief a class used to concurrently process multiple tasks,
+ *        it contains one input-queue and mutiple workers which run in function 'this->run'
+ */
 class ThreadPool {
 public:
 
@@ -248,8 +270,7 @@ protected:
     BlockingQueue<ITask *> _task_queue;
     std::vector<std::thread *> _threads_info;
 };
-
-};// end of namespace 'vis'
+};// end of namespace 'vistool'
 
 #endif
 

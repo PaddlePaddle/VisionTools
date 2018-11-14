@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <sstream>
+namespace vistool {
+
 //compatiable with glog
 enum {
     INFO = 0,
@@ -51,6 +53,8 @@ protected:
     int _loglevel;
     std::ostream * _logstream;
 };
+
+}; // end of namespace 'vistool'
 
 #define LOG(loglevel) Logger(__FILE__, __LINE__, loglevel).getstream()
 #endif  //DATAREADER_CPP_INCLUDE_LOGGER_H

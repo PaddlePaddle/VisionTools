@@ -32,24 +32,28 @@ def main():
 
         ct += 1
 
-    print('total got %d samples' % ct)
-
+    print('total got %d samples in %dms' % (ct, 1000 * (time.time() - start_ts)))
     train_reader = imagenet.train(train_uri, pre_maps=pre_maps)
     ct = 0
     prev_ct = 0
+    ts = time.time()
     start_ts = time.time()
+    prev_ts = time.time()
     for img, label in train_reader():
         assert img.shape == (3, 224, 224)
 
-        cost = 1000 * (time.time() - start_ts)
+        cost = 1000 * (time.time() - prev_ts)
         if cost >= 1000:
-            start_ts = time.time()
+            prev_ts = time.time()
             print('read %d/%d samples in %dms' % (ct - prev_ct, ct, cost))
             prev_ct = ct
 
+        if ct >= 50000:
+            break
+
         ct += 1
 
-    print('total got %d samples' % ct)
+    print('total got %d samples in %dms' % (ct, 1000 * (time.time() - start_ts)))
 
 if __name__ == "__main__":
     exit(main())
