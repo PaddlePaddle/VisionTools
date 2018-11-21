@@ -1,8 +1,9 @@
 import time
+import sys
 import logging
 import datareader.example.imagenet_demo as imagenet
 
-def main():
+def main(acc=True):
     logging.basicConfig(level=logging.INFO, 
         format='[%(asctime)-15s][%(levelname)s][%(name)s] %(message)s')
 
@@ -16,6 +17,7 @@ def main():
         obj = cPickle.loads(v)
         return obj['image'], obj['label']
 
+    imagenet.g_settings['accelerate'] = acc
     pre_maps = [_parse_kv]
     val_reader = imagenet.val(val_uri, pre_maps=pre_maps)
     ct = 0
@@ -56,4 +58,7 @@ def main():
     print('total got %d samples in %dms' % (ct, 1000 * (time.time() - start_ts)))
 
 if __name__ == "__main__":
-    exit(main())
+    acc = True
+    if len(sys.argv) > 1 and sys.argv[1] == '--accelerate=0':
+        acc = False
+    exit(main(acc))
