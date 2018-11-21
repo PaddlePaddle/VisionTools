@@ -1,6 +1,21 @@
 #!/usr/bin/python
+"""
+# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-""" setup file for datareader
+# function:
+#   setup file for datareader
 """
 
 import os
@@ -35,21 +50,27 @@ else:
         pythonlibdir = os.path.dirname(pythonlibdir)
 
 opencvlibs = [
-    "opencv_world", "IlmImf", "ittnotify", "libjasper",
-    "libpng", "libtiff", "libwebp", "zlib"
+    "opencv_world", "IlmImf", "ittnotify", "libjasper", "libpng", "libtiff",
+    "libwebp", "zlib"
 ]
 
 if not use_turbojpeg:
-    opencvlibs += ["libjpeg"] #include it for libturbojpeg.a has also included this
-    linklibs = [os.path.join(opencvlibdir, 'lib' + lib + '.a') for lib in opencvlibs]
+    opencvlibs += ["libjpeg"
+                   ]  #include it for libturbojpeg.a has also included this
+    linklibs = [
+        os.path.join(opencvlibdir, 'lib' + lib + '.a') for lib in opencvlibs
+    ]
 else:
-    linklibs = [os.path.join(opencvlibdir, 'lib' + lib + '.a') for lib in opencvlibs]
+    linklibs = [
+        os.path.join(opencvlibdir, 'lib' + lib + '.a') for lib in opencvlibs
+    ]
     linklibs += [os.path.join(jpegturbolibdir, 'libturbojpeg.a')]
 
 #use xlinker instead of libraries, to avoid link error
 extralinkflag = ["-fopenmp"] + ['-Xlinker', "-("] + linklibs \
           + ['-Xlinker', "-)"] \
           + [r"-Wl,--rpath=$ORIGIN", "-Wl,--rpath=$ORIGIN/../so", "-Wl,-z,origin"]
+
 
 def make_transform_ext(name, pyxfile, ext_root):
     """ make python extension about libpytransform
@@ -63,13 +84,13 @@ def make_transform_ext(name, pyxfile, ext_root):
         name=name,
         sources=srcfiles,
         define_macros=macros,
-        extra_compile_args=["-O3", "-msse4.2", "-fopenmp", "-std=c++11", "-fPIC"],
-        extra_link_args= extralinkflag,
+        extra_compile_args=[
+            "-O3", "-msse4.2", "-fopenmp", "-std=c++11", "-fPIC"
+        ],
+        extra_link_args=extralinkflag,
         include_dirs=[
-            ext_root + '/include', 
-            ext_root + '/src',
-            opencvincludedir,
-            jpegturboincludedir
+            ext_root, ext_root + '/include', ext_root + '/src',
+            opencvincludedir, jpegturboincludedir
         ],
         library_dirs=[opencvlibdir, pythonlibdir, jpegturbolibdir],
         language='c++')
@@ -85,7 +106,8 @@ extensions = [make_transform_ext(lib_modname, pyxfile, cpp_root)]
 
 #build package of datareader
 pysource = 'python'
-setup(name=modname,
+setup(
+    name=modname,
     version=version,
     description="a package for data loading and preprocessing in training model",
     packages=find_packages(where=pysource),
