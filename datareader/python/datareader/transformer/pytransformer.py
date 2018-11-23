@@ -1,5 +1,20 @@
 """
-a python wrapper C++ class 'pyTransformer'
+# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# function
+#   a python wrapper C++ class 'pyTransformer'
 """
 
 import os
@@ -12,24 +27,26 @@ from .libpytransform import pyTransformer
 #ref to 'include/opencv2/imgproc.hpp' for detail
 interpolation_flags = {
     'INTER_NEAREST': 0,
-    'INTER_LINEAR': 1, #bilinear interpolation
-    'INTER_CUBIC': 2, # bicubic interpolation
+    'INTER_LINEAR': 1,  #bilinear interpolation
+    'INTER_CUBIC': 2,  # bicubic interpolation
     'INTER_AREA': 3,
-    'INTER_LANCZOS4': 4, # Lanczos interpolation over 8x8 neighborhood
-    'INTER_LINEAR_EXACT': 5, # Bit exact bilinear interpolation
-    'INTER_MAX': 7, # mask for interpolation codes
+    'INTER_LANCZOS4': 4,  # Lanczos interpolation over 8x8 neighborhood
+    'INTER_LINEAR_EXACT': 5,  # Bit exact bilinear interpolation
+    'INTER_MAX': 7,  # mask for interpolation codes
     'WARP_FILL_OUTLIERS': 8,
 }
+
 
 class PyTransformer(object):
     """ a wrapper for 'pyTransformer' implemented in C++
     """
+
     def __init__(self, transformer, conf, with_meta=False):
         self._transformer = transformer
         self._conf = conf.copy()
         self._buffer = {}
         self._id = 0
-        self._with_meta = with_meta #whether allowed to meta to pass through
+        self._with_meta = with_meta  #whether allowed to meta to pass through
 
     def start(self):
         """ start the underling pyTransformer
@@ -76,6 +93,7 @@ class PyTransformer(object):
 class Builder(object):
     """ a builder to configure and create pyTransformer from C++
     """
+
     def __init__(self, thread_num=1, queue_limit=1000):
         self.reset()
         self._conf['thread_num'] = thread_num
@@ -104,9 +122,7 @@ class Builder(object):
             mode = 'RGB'
 
         #defined in 'opencv2/imgcodecs/imgcodecs_c.h'
-        mode2num = {'UNCHANGED': -1,
-                    'GRAY': 0,
-                    'RGB': 1}
+        mode2num = {'UNCHANGED': -1, 'GRAY': 0, 'RGB': 1}
         conf = {"mode": mode2num[mode]}
         self._ops.append(("decode", conf))
         return self
@@ -124,9 +140,11 @@ class Builder(object):
             self
         """
         conf = {
-                "crop_x": str(x), "crop_y": str(y),
-                "crop_w": str(w), "crop_h": str(h),
-                }
+            "crop_x": str(x),
+            "crop_y": str(y),
+            "crop_w": str(w),
+            "crop_h": str(h),
+        }
         self._ops.append(("crop", conf))
         return self
 
@@ -142,10 +160,12 @@ class Builder(object):
         """
         if type(size) is int:
             size = (size, size)
+
         conf = {
-                "crop_center": str(1 if center else 0),
-                "crop_w": str(size[0]), "crop_h": str(size[1]),
-                }
+            "crop_center": str(1 if center else 0),
+            "crop_w": str(size[0]),
+            "crop_h": str(size[1]),
+        }
         self._ops.append(("crop", conf))
         return self
 
@@ -160,13 +180,18 @@ class Builder(object):
         Return:
             self
         """
+        if type(size) is int:
+            size = (size, size)
+
         scale = [0.08, 1.0] if scale is None else scale
         ratio = [3. / 4., 4. / 3.] if ratio is None else ratio
 
-        conf = {"scale": ",".join([str(i) for i in scale]),
-                "ratio": ",".join([str(i) for i in ratio]),
-                "interpolation": interpolation_flags['INTER_LANCZOS4'],
-                "final_size": ",".join([str(i) for i in size])}
+        conf = {
+            "scale": ",".join([str(i) for i in scale]),
+            "ratio": ",".join([str(i) for i in ratio]),
+            "interpolation": interpolation_flags['INTER_LANCZOS4'],
+            "final_size": ",".join([str(i) for i in size])
+        }
         self._ops.append(("random_crop", conf))
         return self
 
@@ -182,8 +207,11 @@ class Builder(object):
         elif type(interpolation) is str:
             interpolation = interpolation_flags[interpolation]
 
-        conf = {"resize_w": str(w), "resize_h": str(h),
-                "interpolation": str(interpolation)}
+        conf = {
+            "resize_w": str(w),
+            "resize_h": str(h),
+            "interpolation": str(interpolation)
+        }
         self._ops.append(("resize", conf))
         return self
 
@@ -235,9 +263,9 @@ class Builder(object):
         """
         code2num = {'FLIP_TOP_BOTTOM': 0, 'FLIP_LEFT_RIGHT': 1}
         conf = {
-                "flip_code": str(code2num[flip_code]),
-                "random": str(1 if random else 0),
-                }
+            "flip_code": str(code2num[flip_code]),
+            "random": str(1 if random else 0),
+        }
         self._ops.append(("flip", conf))
         return self
 
@@ -259,12 +287,14 @@ class Builder(object):
         for op_name, op_conf in self._ops:
             t.add_op(op_name, op_conf)
 
-        return PyTransformer(t, {'conf': self._conf, 'ops': self._ops}, with_meta)
+        return PyTransformer(t, {'conf': self._conf,
+                                 'ops': self._ops}, with_meta)
 
 
 class Keeper(object):
     """ a class for holding resource object and stop them when no reference exist
     """
+
     def __init__(self, o):
         self._resources = [o]
 
@@ -281,7 +311,6 @@ class Keeper(object):
 
 def fast_xmap_readers(reader, builder, buffer_size=1000, \
         with_label=True, post_mapper=None):
-
     def _mapper(r):
         if post_mapper is not None:
             return post_mapper(r)
@@ -300,7 +329,7 @@ def fast_xmap_readers(reader, builder, buffer_size=1000, \
             return False
         elif 'err_no' in ctx and ctx['err_no'] != 0:
             logger.info('faield convert image err_no[%d] and err_msg[%s]',
-                    ctx['err_no'], ctx['err_msg'])
+                        ctx['err_no'], ctx['err_msg'])
             return True
         else:
             if len(meta) > 0:
@@ -345,6 +374,8 @@ def fast_xmap_readers(reader, builder, buffer_size=1000, \
                 pass
             else:
                 yield r
+
     return _sync_reader
+
 
 #/* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

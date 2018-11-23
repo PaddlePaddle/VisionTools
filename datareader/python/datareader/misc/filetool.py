@@ -1,16 +1,36 @@
 """
-tools used for accessing files
+# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# function 
+#   tools used for accessing files
 """
+
 import os
+
+
 class FileProxy(object):
     """ class to wrap a file for read and close,
         which is used for the purpose of cacheing data
     """
+
     def __init__(self, fd, cache):
         self.fd = fd
         self.cache_file = cache
         self.cached_fd = open(cache, 'wb')
-        assert self.cached_fd is not None, "failed to open file[%s] to cache" % (cache)
+        assert self.cached_fd is not None, "failed to open file[%s] to cache" % (
+            cache)
 
     def close(self):
         """ close proxy
@@ -95,5 +115,6 @@ def open_file(uri, cache_to=None, suffix=''):
         return open(uri2path(uri))
     else:
         return DfsTool.open(uri, cache_to, suffix)
+
 
 #/* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

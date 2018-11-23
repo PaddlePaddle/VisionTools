@@ -1,9 +1,25 @@
 """
-base class for different data source
+# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# function
+#   base class for different data source
 """
 
 import os
 from urlparse import urlparse
+
 
 class SourceError(ValueError):
     """ source error
@@ -23,8 +39,15 @@ def strip_spaces(l):
 class SourceMeta(object):
     """ meta of data source
     """
-    def __init__(self, uri, filetype=None, part_id=None,
-            part_num=None, cache=None, infinite=False, to_dict=True):
+
+    def __init__(self,
+                 uri,
+                 filetype=None,
+                 part_id=None,
+                 part_num=None,
+                 cache=None,
+                 infinite=False,
+                 to_dict=True):
         """ init
         """
         self.uri = strip_spaces(uri)
@@ -44,7 +67,7 @@ class SourceMeta(object):
             uri_path = urlparse(self.uri).path
             self.cache_sub_dir = uri_path.replace('/', '_').lstrip('_')
 
-        self.total_file_num = None #total file num for this dataset before partition
+        self.total_file_num = None  #total file num for this dataset before partition
         self.flist = None
         self.sample_num = None
 
@@ -70,6 +93,7 @@ class DataSource(object):
     """ abstraction of different data sources
     """
     _supported_sources = []
+
     @classmethod
     def create(cls, meta):
         """ create a datasource
@@ -119,7 +143,8 @@ class DataSource(object):
     def _make_reader(self):
         """ make a reader of this source
         """
-        raise NotImplementedError('invalid callinig to _make_reader of DataSource')
+        raise NotImplementedError(
+            'invalid callinig to _make_reader of DataSource')
 
     def reader(self, infinite=None):
         """ get a reader of this source
@@ -132,6 +157,7 @@ class DataSource(object):
         """
         rd = self._make_reader()
         infinite = infinite if infinite is not None else self.meta.infinite
+
         def _reader():
             while True:
                 for i in rd():
@@ -149,9 +175,14 @@ def load(uri, filetype=None, part_id=None, part_num=None, **kwargs):
     Returns:
         DataSource instance
     """
-    m = SourceMeta(uri=uri, filetype=filetype, part_id=part_id,
-            part_num=part_num, **kwargs)
+    m = SourceMeta(
+        uri=uri,
+        filetype=filetype,
+        part_id=part_id,
+        part_num=part_num,
+        **kwargs)
 
     return DataSource.create(m)
+
 
 #/* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

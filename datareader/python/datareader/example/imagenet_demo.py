@@ -1,4 +1,21 @@
-""" a demo to show how to create a pipline of transformation on imagenet data
+"""
+# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# function
+#    a demo to show how to create a pipline of transformation on imagenet data
+#
 """
 import sys
 import os
@@ -8,10 +25,18 @@ from .. import operator
 from .. import source
 from .. import pipeline
 
-g_settings = {'img_size': 224, 'normalize': False, 
-        'part_id': 0, 'part_num': 1, 'cache': None,
-        'workers': 16, 'decoded_bufsize': 10000, 
-        'shuffle_size': 100, 'accelerate': True}
+g_settings = {
+    'img_size': 224,
+    'normalize': False,
+    'part_id': 0,
+    'part_num': 1,
+    'cache': None,
+    'workers': 16,
+    'decoded_bufsize': 10000,
+    'shuffle_size': 100,
+    'accelerate': True
+}
+
 
 def train_image_mapper(img_size=None, normalize=None):
     """ a image mapper for training data
@@ -50,7 +75,12 @@ def test_image_mapper(img_size=None, normalize=None):
     return img_ops
 
 
-def make_reader(mode, uri, part_id=None, part_num=None, cache=None, pre_maps=None):
+def make_reader(mode,
+                uri,
+                part_id=None,
+                part_num=None,
+                cache=None,
+                pre_maps=None):
     infinite = False
     if mode == 'train':
         infinite = True
@@ -64,8 +94,12 @@ def make_reader(mode, uri, part_id=None, part_num=None, cache=None, pre_maps=Non
     if cache is None:
         cache = g_settings['cache']
 
-    sc = source.load(uri=uri, part_id=part_id, part_num=part_num,
-            cache=cache, infinite=infinite)
+    sc = source.load(
+        uri=uri,
+        part_id=part_id,
+        part_num=part_num,
+        cache=cache,
+        infinite=infinite)
 
     p = pipeline.Pipeline()
     shuffle_size = g_settings['shuffle_size']
@@ -74,7 +108,8 @@ def make_reader(mode, uri, part_id=None, part_num=None, cache=None, pre_maps=Non
 
     maps = []
     if pre_maps is not None:
-        assert type(pre_maps) is list, 'invalid pre_maps param in build_pipeline'
+        assert type(
+            pre_maps) is list, 'invalid pre_maps param in build_pipeline'
         maps += pre_maps
 
     workers = g_settings['workers']
@@ -84,8 +119,11 @@ def make_reader(mode, uri, part_id=None, part_num=None, cache=None, pre_maps=Non
     img_ops = train_image_mapper() if mode == 'train' else test_image_mapper()
     for m in maps:
         p.map(m)
-    p.map_ops(img_ops, workers=workers,
-        decoded_bufsize=decoded_bufsize, accelerate=accelerate)
+    p.map_ops(
+        img_ops,
+        workers=workers,
+        decoded_bufsize=decoded_bufsize,
+        accelerate=accelerate)
     return p.transform(sc.reader())
 
 

@@ -1,5 +1,5 @@
 """
-# Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserved
+# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 """
 
 __all__ = [
-    'map_readers', 'buffered', 'compose', 'chain', 'shuffle','xmap_readers'
+    'map_readers', 'buffered', 'compose', 'chain', 'shuffle', 'xmap_readers'
 ]
 
 from threading import Thread
@@ -30,6 +30,8 @@ import logging
 import traceback
 
 logger = logging.getLogger(__name__)
+
+
 def map_readers(func, *readers):
     """
     Creates a data reader that outputs return value of function using
@@ -73,6 +75,7 @@ def shuffle(reader, buf_size):
 
     assert buf_size > 0, "invalid buf_size in shuffle" % (buf_size)
     end = ReaderEndSignal()
+
     def _start_prefetch(rd, inq, outq):
         def _fetcher(rd, inq, outq):
             for i, d in enumerate(rd()):
@@ -109,10 +112,10 @@ def shuffle(reader, buf_size):
                     if buf:
                         yield_buf += buf
                         buf = []
-                
+
             if len(yield_buf) > 0:
                 yield yield_buf.pop(0)
-                token_q.put(True) #need more
+                token_q.put(True)  #need more
             elif stopped:
                 break
 
@@ -168,6 +171,7 @@ def buffered(reader, size):
     assert size > 0, "invalid param size[%d] for buffered" % (size)
 
     end = ReaderEndSignal()
+
     def read_worker(r, q):
         """ read_reader """
         try:
@@ -200,6 +204,7 @@ def buffered(reader, size):
 class XmapEndSignal(ValueError):
     """ XmapEndSignal
     """
+
     def __init__(self, errmsg='', errno=-1):
         """ init
         """
@@ -341,6 +346,7 @@ def xmap_readers(reader, mapper=None, process_num=16, buffer_size=1000,\
     :return: the decarated reader
     :rtype: callable
     """
+
     def xreader():
         """ xreader
         """
@@ -358,12 +364,13 @@ def xmap_readers(reader, mapper=None, process_num=16, buffer_size=1000,\
         p.start()
         # start several handle_workers
         target = order_handle_worker if order else handle_worker
-        args = (in_queue, out_queue, mapper, out_order, flatmap) if order else (
-            in_queue, out_queue, mapper, flatmap)
+        args = (in_queue, out_queue, mapper, out_order,
+                flatmap) if order else (in_queue, out_queue, mapper, flatmap)
         workers = []
         for i in xrange(process_num):
             #worker = Thread(target=target, args=args)
-            worker = get_worker(use_process=use_process, target=target, args=args)
+            worker = get_worker(
+                use_process=use_process, target=target, args=args)
             worker.daemon = True
             workers.append(worker)
         for w in workers:

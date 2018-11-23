@@ -1,14 +1,30 @@
 # -*- coding: utf-8 -*-
+"""
+# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# function
+#   helper functions for kv data read/write, support 2 kinds of files:
+#    1, sequencefile
+#    2, raw kv file whose contents are organized like: [klen][key][vlen][value]...
+"""
 
-"""
-helper functions for kv data read/write, two kinds of data files are supported now:
-    1, sequencefile
-    2, raw kv file whose contents are organized like: [klen][key][vlen][value]...
-"""
 import time
 import sys
 import struct
 import random
+
 
 class Stream(object):
     """ bytes stream like sys.stdin
@@ -85,6 +101,7 @@ class Stream(object):
 class KvFileReader(object):
     """ a reader for kv data
     """
+
     def __init__(self, kvfile=None):
         self.type = 'rawkv'
         if kvfile is None:
@@ -223,6 +240,7 @@ class SequenceFileWriter(object):
                    "\x00\x00\x00\x00\x00\x00"
     # after writing how many bytes of actual data we insert a sync marker
     SYNC_INTERVAL = 2000
+
     def __init__(self, f):
         """ Construct a sequencefile writer for specified file-like object f
         """

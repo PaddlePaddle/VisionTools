@@ -1,5 +1,19 @@
 """
-This module provide a tool to facilitate the chainning of different readers
+# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @brief This module provide a tool to facilitate the chainning of different readers
 """
 
 import types
@@ -11,6 +25,8 @@ import threading
 from . import decorator
 
 logger = logging.getLogger(__name__)
+
+
 class PipelineError(ValueError):
     """ PipelineError
     """
@@ -21,6 +37,7 @@ class SafeIter(object):
     """Takes an iterator/generator and makes it thread-safe by
     serializing call to the `next` method of given iterator/generator.
     """
+
     def __init__(self, it):
         """__init__"""
         self.it = it
@@ -70,6 +87,7 @@ def _batch(reader, batch_size, drop):
 def filter_reader(func, reader):
     """ filter
     """
+
     def _reader():
         for r in filter(func, reader()):
             yield r
@@ -83,6 +101,7 @@ def cache_reader(reader, where='memory'):
     assert where == 'memory', 'now only memory cache is supported for this api'
 
     cache_status = {'cached': False, 'data': []}
+
     def _reader():
         if cache_status['cached']:
             logger.debug('use data in memory cache')
@@ -116,6 +135,7 @@ def chain_funcs(funcs):
 class Context(object):
     """ a class to record the context of a transformation in pipeline
     """
+
     def __init__(self):
         self._in_num = 0
         self._out_num = 0
@@ -227,8 +247,10 @@ class Pipeline(object):
         assert (record_mapper is None and reader_mapper is not None) or \
                 (record_mapper is not None and reader_mapper is None)
 
-        self._pipeline.append(('map', {'record_mapper': record_mapper,
-            'reader_mapper': reader_mapper}))
+        self._pipeline.append(('map', {
+            'record_mapper': record_mapper,
+            'reader_mapper': reader_mapper
+        }))
         return self
 
     def map_ops(self, ops, *args, **kwargs):
@@ -254,7 +276,12 @@ class Pipeline(object):
         self._pipeline.append(('filter', {'func': f}))
         return self
 
-    def xmap(self, funcs, process_num=8, buffer_size=1024, order=False, use_process=False):
+    def xmap(self,
+             funcs,
+             process_num=8,
+             buffer_size=1024,
+             order=False,
+             use_process=False):
         """ use multipleprocess to map samples from previouse reader
 
         Args:
@@ -347,11 +374,13 @@ class Pipeline(object):
             elif op_name == 'filter':
                 rd = filter_reader(param['func'], rd)
             elif op_name == 'xmap':
-                rd = decorator.xmap_readers(rd,
-                        mapper=param['func'],
-                        process_num=param['process_num'],
-                        buffer_size=param['buffer_size'], 
-                        order=param['order'], use_process=param['use_process'])
+                rd = decorator.xmap_readers(
+                    rd,
+                    mapper=param['func'],
+                    process_num=param['process_num'],
+                    buffer_size=param['buffer_size'],
+                    order=param['order'],
+                    use_process=param['use_process'])
             else:
                 raise PipelineError('not supported trasnfromation[%s]' %
                                     (op_name))
@@ -369,7 +398,8 @@ class Pipeline(object):
                 if not infinite:
                     break
 
-        _guard_reader = SafeIter(_guard_reader) if self.threadsafe else _guard_reader
+        _guard_reader = SafeIter(
+            _guard_reader) if self.threadsafe else _guard_reader
         return _guard_reader
 
     def reader(self, infinite=False):

@@ -1,4 +1,17 @@
-""" operators used to applied on samples
+"""
+# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 
 import os
@@ -16,17 +29,22 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 import logging
 logger = logging.getLogger(__name__)
 
+
 class OperatorParamError(ValueError):
     pass
+
 
 class Operator(object):
     """ base class for all kinds of operator which is used to transform a sample,
         such as decode/resize/crop image
     """
+
     def __init__(self):
         pass
 
     def execute(self, *args, **kwargs):
+        """ execute the transformation plan defined by this op
+        """
         return self._execute(*args, **kwargs)
 
     def _execute(self, *args, **kwargs):
@@ -34,6 +52,9 @@ class Operator(object):
             % (type(self).__name__))
 
     def make_plan(self, builder):
+        """ register the transformation plan to 'builder' which
+            can be used to create an accelerated pipeline of transformations
+        """
         return self._make_plan(builder)
 
     def _make_plan(self, builder):
@@ -45,11 +66,12 @@ class DecodeImage(Operator):
     def __init__(self, to_rgb=True, to_np=False, channel_first=False):
         super(DecodeImage, self).__init__()
         self.to_rgb = to_rgb
-        self.to_np = to_np #to numpy
-        self.channel_first = channel_first #only enabled when to_np is True
+        self.to_np = to_np  #to numpy
+        self.channel_first = channel_first  #only enabled when to_np is True
 
     def _execute(self, img):
-        assert type(img) is str and len(img) > 0, "invalid input 'img' in DecodeImage"
+        assert type(img) is str and len(
+            img) > 0, "invalid input 'img' in DecodeImage"
         stream = io.BytesIO(img)
         img = Image.open(stream)
         if self.to_rgb and img.mode != 'RGB':
@@ -59,7 +81,7 @@ class DecodeImage(Operator):
             img = np.array(img)
             if channel_first:
                 img = img.transpose((2, 0, 1))
-        
+
         return img
 
     def _make_plan(self, builder):
@@ -81,7 +103,8 @@ class NormalizeImage(Operator):
         if isinstance(img, Image.Image):
             img = np.array(img)
 
-        assert isinstance(img, np.ndarray), "invalid input 'img' in NormalizeImage"
+        assert isinstance(img,
+                          np.ndarray), "invalid input 'img' in NormalizeImage"
         return (img.astype('float32') * self.scale - self.mean) / self.std
 
 
@@ -115,7 +138,8 @@ class ResizeImage(Operator):
                 'both 'size' and 'resize_short' are None")
 
     def _execute(self, img):
-        assert isinstance(img, Image.Image), "invalid input 'img' in ResizeImage"
+        assert isinstance(img,
+                          Image.Image), "invalid input 'img' in ResizeImage"
         if self.resize_short is not None:
             percent = float(self.resize_short) / min(img.size[0], img.size[1])
             w = int(round(img.size[0] * percent))
@@ -143,7 +167,8 @@ class RotateImage(Operator):
         self.rand = rand
 
     def _execute(self, img):
-        assert isinstance(img, Image.Image), "invalid input 'img' in RandRotateImage"
+        assert isinstance(
+            img, Image.Image), "invalid input 'img' in RandRotateImage"
         rg = self.range
         if self.rand:
             angle = random.randint(-rg, rg)
@@ -151,12 +176,13 @@ class RotateImage(Operator):
             angle = rg
 
         return img.rotate(angle)
- 
+
     def _make_plan(self, builder):
         if self.rand:
             return builder.rotate(random_range=self.range)
         else:
             return builder.rotate(angle=self.range)
+
 
 class CropImage(Operator):
     def __init__(self, size):
@@ -167,12 +193,13 @@ class CropImage(Operator):
             self.size = size
 
     def _execute(self, img):
-        assert isinstance(img, Image.Image), "invalid input 'img' in ResizeImage"
+        assert isinstance(img,
+                          Image.Image), "invalid input 'img' in ResizeImage"
         w, h = self.size
         width, height = img.size
         w_start = (width - w) / 2
         h_start = (height - h) / 2
-       
+
         w_end = w_start + w
         h_end = h_start + h
         return img.crop((w_start, h_start, w_end, h_end))
@@ -193,18 +220,19 @@ class RandCropImage(Operator):
         self.ratio = [3. / 4., 4. / 3.] if ratio is None else ratio
 
     def _execute(self, img):
-        assert isinstance(img, Image.Image), "invalid input 'img' in RandCropImage"
+        assert isinstance(img,
+                          Image.Image), "invalid input 'img' in RandCropImage"
 
         size = self.size
         scale = self.scale
         ratio = self.ratio
-        
+
         aspect_ratio = math.sqrt(random.uniform(*ratio))
         w = 1. * aspect_ratio
         h = 1. / aspect_ratio
 
-        bound = min((float(img.size[0]) / img.size[1]) / (w ** 2),
-                    (float(img.size[1]) / img.size[0]) / (h ** 2))
+        bound = min((float(img.size[0]) / img.size[1]) / (w**2),
+                    (float(img.size[1]) / img.size[0]) / (h**2))
         scale_max = min(scale[1], bound)
         scale_min = min(scale[0], bound)
 
@@ -222,7 +250,8 @@ class RandCropImage(Operator):
         return img
 
     def _make_plan(self, builder):
-        return builder.random_crop(self.size, scale=self.scale, ratio=self.ratio)
+        return builder.random_crop(
+            self.size, scale=self.scale, ratio=self.ratio)
 
 
 class RandFlipImage(Operator):
@@ -231,7 +260,8 @@ class RandFlipImage(Operator):
         self.flip_dir = flip_dir if flip_dir is not None else Image.FLIP_LEFT_RIGHT
 
     def _execute(self, img):
-        assert isinstance(img, Image.Image), "invalid input 'img' in RandFlipImage"
+        assert isinstance(img,
+                          Image.Image), "invalid input 'img' in RandFlipImage"
         if random.randint(0, 1) == 1:
             return img.transpose(self.flip_dir)
         else:
@@ -243,7 +273,8 @@ class RandFlipImage(Operator):
         elif self.flip_dir == Image.FLIP_TOP_BOTTOM:
             flip_dir = 'FLIP_TOP_BOTTOM'
         else:
-            raise OperatorParamError("not support this type of flip[%d]" % (self.flip_dir))
+            raise OperatorParamError("not support this type of flip[%d]" %
+                                     (self.flip_dir))
 
         return builder.flip(flip_dir, random=True)
 
@@ -270,7 +301,8 @@ class RandDistortColor(Operator):
         self.ops = [random_brightness, random_contrast, random_color]
 
     def _execute(self, img):
-        assert isinstance(img, Image.Image), "invalid input 'img' in RandomFlipImage"
+        assert isinstance(
+            img, Image.Image), "invalid input 'img' in RandomFlipImage"
         ops = copy.copy(self.ops)
         random.shuffle(ops)
         for f in ops:
@@ -283,6 +315,7 @@ def support_multiple_inputs(func):
     """ a decorator to make function can accept a tuple as argument,
         like: (img, label) (img, ) or img
     """
+
     def _decorated_func(args):
         if isinstance(args, tuple):
             first = args[0]
@@ -338,7 +371,7 @@ def build(ops, workers=16, decoded_bufsize=10000, accelerate=False):
     """ build a function which accept a reader and return another processed reader
     """
     logger.debug('build image ops with workers:%d, decoded_bufsize:%d, acc:%s',
-        workers, decoded_bufsize, str(accelerate))
+                 workers, decoded_bufsize, str(accelerate))
 
     if not accelerate:
         from ..pipeline.decorator import xmap_readers
@@ -354,6 +387,4 @@ def build(ops, workers=16, decoded_bufsize=10000, accelerate=False):
         bd = Builder(thread_num=workers, queue_limit=decoded_bufsize)
         post_mapper = build_fast_mapper(ops, bd)
         return functools.partial(
-            fast_xmap_readers,
-            builder=bd,
-            post_mapper=post_mapper)
+            fast_xmap_readers, builder=bd, post_mapper=post_mapper)

@@ -1,6 +1,19 @@
 """
-a source for local data
+# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
+
 import os
 import random
 import logging
@@ -10,10 +23,13 @@ from .source import DataSource
 from .file_reader import FileReader
 
 logger = logging.getLogger(__name__)
+
+
 class LocalSource(DataSource):
     """ source for data on local disk
     """
     _type_name = 'LOCAL_SOURCE'
+
     def __init__(self, meta):
         super(LocalSource, self).__init__()
         assert self.is_supported(meta.uri)
@@ -60,7 +76,8 @@ class LocalSource(DataSource):
         """
         m = self.meta
 
-        notified = {'index':None, 'samples': None}
+        notified = {'index': None, 'samples': None}
+
         def _notify(index, samples=None):
             notified['index'] = index
             notified['samples'] = samples
@@ -75,13 +92,13 @@ class LocalSource(DataSource):
                 with open(self.strip_prefix(fname), 'r') as f:
                     yield f
 
-                if index == notified['index'] and notified['samples'] is not None:
+                if index == notified['index'] and notified[
+                        'samples'] is not None:
                     s = notified['samples']
                     total_samples += s
                     logger.debug('read %d/%d from file[%s]' % \
                             (s, total_samples, os.path.basename(fname)))
                     notified['samples'] = None
-
 
         return FileReader(m.filetype, _fd_reader, _notify).reader
 

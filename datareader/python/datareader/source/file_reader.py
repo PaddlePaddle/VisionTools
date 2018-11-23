@@ -1,12 +1,26 @@
 """
-file reader implementation
+# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """
 
 import logging
 from .source import SourceError
-from ..misc import kvtool 
+from ..misc import kvtool
 
 logger = logging.getLogger(__name__)
+
+
 def line_reader(f, bufsize=10240):
     """ line reader from file 'f'
     """
@@ -30,6 +44,7 @@ def line_reader(f, bufsize=10240):
 class FileReader(object):
     """ file reader
     """
+
     def __init__(self, filetype, fd_reader, notify=None):
         """ init
 
@@ -66,5 +81,6 @@ class FileReader(object):
                     self.notify(i, samples=ct)
         else:
             raise SourceError('not supported filetype[%s]' % (ft))
+
 
 #/* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
