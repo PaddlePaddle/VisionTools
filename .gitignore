@@ -1,2 +1,4 @@
 build/
 third_party/thread
+*.pyc
+.*.sw*
