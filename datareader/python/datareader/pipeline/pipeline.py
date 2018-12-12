@@ -12,8 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# @brief This module provide a tool to facilitate the chainning of different readers
+"""
+"""
+# This module provide a tool to facilitate the chainning of different readers
 """
 
 import types
@@ -256,7 +257,7 @@ class Pipeline(object):
     def map_ops(self, ops, *args, **kwargs):
         """ map a list of Operators in 'ops'
         """
-        from ..operator import build
+        from ..operators import build
         reader_mapper = build(ops, *args, **kwargs)
         return self.map(reader_mapper=reader_mapper)
 
@@ -279,7 +280,7 @@ class Pipeline(object):
     def xmap(self,
              funcs,
              process_num=8,
-             buffer_size=1024,
+             buffer_size=1000,
              order=False,
              use_process=False):
         """ use multipleprocess to map samples from previouse reader
@@ -374,13 +375,13 @@ class Pipeline(object):
             elif op_name == 'filter':
                 rd = filter_reader(param['func'], rd)
             elif op_name == 'xmap':
-                rd = decorator.xmap_readers(
-                    rd,
+                xmapper = decorator.Xmap(
                     mapper=param['func'],
                     process_num=param['process_num'],
                     buffer_size=param['buffer_size'],
                     order=param['order'],
                     use_process=param['use_process'])
+                rd = xmapper(rd)
             else:
                 raise PipelineError('not supported trasnfromation[%s]' %
                                     (op_name))

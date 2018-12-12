@@ -15,7 +15,8 @@
 """
 
 __all__ = [
-    'map_readers', 'buffered', 'compose', 'chain', 'shuffle', 'xmap_readers'
+    'map_readers', 'buffered', 'compose', 'chain', 'shuffle', 'xmap_reader',
+    'Xmap', 'SharedXmap'
 ]
 
 from threading import Thread
@@ -328,8 +329,23 @@ def order_handle_worker(in_queue, out_queue, mapper, out_order):
     out_queue.put(end)
 
 
-def xmap_readers(reader, mapper=None, process_num=16, buffer_size=1000,\
-        order=False, use_process=False, flatmap=False):
+def xmap_readers(reader, mapper=None, worker_num=16, buffer_size=None,\
+        order=False, use_process=False, flatmap=False, use_sharedmem=False, \
+        pre_feed=None, **kwargs):
+    buffer_size = 1000 if buffer_size is None else buffer_size
+    if use_sharedmem:
+        from ..shared_memory.fast_xmap import xmap_readers as fast_xmap
+        assert not order and not flatmap, "no supported param for fast_xmap"
+        return fast_xmap(reader, mapper, worker_num, buffer_size, \
+                    use_process, pre_feed, **kwargs)
+    else:
+        return normal_xmap_readers(reader, mapper, worker_num, buffer_size,\
+                    order, use_process, flatmap)
+
+
+def xmap_reader(reader, mapper=None, worker_num=16, \
+        buffer_size=1000, order=False, use_process=False, \
+        flatmap=False, **kwargs):
     """
     Use multiprocess to map samples from reader by a mapper defined by user.
     And this function contains a buffered decorator.
@@ -337,8 +353,8 @@ def xmap_readers(reader, mapper=None, process_num=16, buffer_size=1000,\
     :type mapper: callable
     :param reader: the data reader to read from
     :type reader: callable
-    :param process_num: process number to handle original sample
-    :type process_num: int
+    :param worker_num: process number to handle original sample
+    :type worker_num: int
     :param buffer_size: max buffer size
     :type buffer_size: int
     :param order: keep the order of reader
@@ -346,6 +362,8 @@ def xmap_readers(reader, mapper=None, process_num=16, buffer_size=1000,\
     :return: the decarated reader
     :rtype: callable
     """
+    logger.debug('not used params in decorator.xmap_reader:[%s]' %
+                 (str(kwargs)))
 
     def xreader():
         """ xreader
@@ -367,7 +385,7 @@ def xmap_readers(reader, mapper=None, process_num=16, buffer_size=1000,\
         args = (in_queue, out_queue, mapper, out_order,
                 flatmap) if order else (in_queue, out_queue, mapper, flatmap)
         workers = []
-        for i in xrange(process_num):
+        for i in xrange(worker_num):
             #worker = Thread(target=target, args=args)
             worker = get_worker(
                 use_process=use_process, target=target, args=args)
@@ -386,7 +404,7 @@ def xmap_readers(reader, mapper=None, process_num=16, buffer_size=1000,\
             errexp = sample
 
         finish = 1
-        while finish < process_num:
+        while finish < worker_num:
             sample = out_queue.get()
             if isinstance(sample, XmapEndSignal):
                 finish += 1
@@ -399,3 +417,33 @@ def xmap_readers(reader, mapper=None, process_num=16, buffer_size=1000,\
             raise errexp
 
     return xreader
+
+
+class Xmap(object):
+    def __init__(self, mapper, worker_num=16,\
+        buffer_size=1000, order=False, use_process=False,\
+        flatmap=False, **kwargs):
+        self.args = {}
+        for k, v in locals().items():
+            if k not in ['self', 'kwargs']:
+                self.args[k] = v
+        self.args.update(kwargs)
+
+    def __call__(self, reader):
+        return xmap_reader(reader, **self.args)
+
+
+class SharedXmap(object):
+    def __init__(self, mapper, worker_num=16, \
+        buffer_size=1000, use_process=True, use_sharedmem=True,\
+        pre_feed=None, **kwargs):
+        self.args = {}
+        for k, v in locals().items():
+            if k not in ['self', 'kwargs']:
+                self.args[k] = v
+
+        self.args.update(kwargs)
+
+    def __call__(self, reader):
+        from ..shared_memory.shared_xmap import xmap_reader as xmap
+        return xmap(reader, **self.args)

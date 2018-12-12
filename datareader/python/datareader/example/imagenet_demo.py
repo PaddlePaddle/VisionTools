@@ -21,7 +21,8 @@ import sys
 import os
 import time
 import logging
-from .. import operator
+import copy
+from .. import operators as ops
 from .. import source
 from .. import pipeline
 
@@ -31,33 +32,39 @@ g_settings = {
     'part_id': 0,
     'part_num': 1,
     'cache': None,
-    'workers': 16,
-    'decoded_bufsize': 10000,
-    'shuffle_size': 100,
-    'accelerate': True
+    'shuffle_size': 10000,
+    'worker_args': {
+        'cpp_xmap': False,
+        'worker_num': 16,
+        'buffer_size': 3000,
+        'use_process': True,
+        'use_sharedmem': True
+    }
 }
 
 
-def train_image_mapper(img_size=None, normalize=None):
+def train_image_mapper(img_size=None, normalize=None, default_class='pil'):
     """ a image mapper for training data
     """
     if img_size is None:
         img_size = g_settings['img_size']
     if normalize is None:
         normalize = g_settings['normalize']
-    img_ops = [operator.DecodeImage()]
-    img_ops += [operator.RotateImage(10, rand=True)]
-    img_ops += [operator.RandCropImage(img_size)]
-    img_ops += [operator.RandFlipImage()]
-    img_ops += [operator.ToCHWImage()]
+
+    ops.default_class = default_class
+    img_ops = [ops.DecodeImage()]
+    img_ops += [ops.RotateImage(10, rand=True)]
+    img_ops += [ops.RandCropImage(img_size)]
+    img_ops += [ops.RandFlipImage()]
+    img_ops += [ops.ToCHWImage(op_class='pil')]
 
     if normalize:
-        img_ops += [operator.NormalizeImage()]
+        img_ops += [ops.NormalizeImage()]
 
     return img_ops
 
 
-def test_image_mapper(img_size=None, normalize=None):
+def test_image_mapper(img_size=None, normalize=None, default_class='pil'):
     """ a image mapper for testing data
     """
     if img_size is None:
@@ -65,12 +72,13 @@ def test_image_mapper(img_size=None, normalize=None):
     if normalize is None:
         normalize = g_settings['normalize']
 
-    img_ops = [operator.DecodeImage()]
-    img_ops += [operator.ResizeImage(resize_short=img_size)]
-    img_ops += [operator.CropImage(img_size)]
-    img_ops += [operator.ToCHWImage()]
+    ops.default_class = default_class
+    img_ops = [ops.DecodeImage()]
+    img_ops += [ops.ResizeImage(resize_short=img_size)]
+    img_ops += [ops.CropImage(img_size)]
+    img_ops += [ops.ToCHWImage(op_class='pil')]
     if normalize:
-        img_ops += [operator.NormalizeImage()]
+        img_ops += [ops.NormalizeImage()]
 
     return img_ops
 
@@ -80,7 +88,8 @@ def make_reader(mode,
                 part_id=None,
                 part_num=None,
                 cache=None,
-                pre_maps=None):
+                pre_maps=None,
+                **kwargs):
     infinite = False
     if mode == 'train':
         infinite = True
@@ -102,9 +111,13 @@ def make_reader(mode,
         infinite=infinite)
 
     p = pipeline.Pipeline()
-    shuffle_size = g_settings['shuffle_size']
-    if mode == 'train' and shuffle_size > 0:
-        p.shuffle(shuffle_size)
+    if 'shuffle_size' in kwargs:
+        sf_sz = kwargs['shuffle_size']
+    else:
+        sf_sz = g_settings['shuffle_size']
+
+    if mode == 'train' and sf_sz > 0:
+        p.shuffle(sf_sz)
 
     maps = []
     if pre_maps is not None:
@@ -112,18 +125,12 @@ def make_reader(mode,
             pre_maps) is list, 'invalid pre_maps param in build_pipeline'
         maps += pre_maps
 
-    workers = g_settings['workers']
-    decoded_bufsize = g_settings['decoded_bufsize']
-    accelerate = g_settings['accelerate']
-
+    args = copy.deepcopy(g_settings['worker_args'])
+    args.update(kwargs)
     img_ops = train_image_mapper() if mode == 'train' else test_image_mapper()
     for m in maps:
         p.map(m)
-    p.map_ops(
-        img_ops,
-        workers=workers,
-        decoded_bufsize=decoded_bufsize,
-        accelerate=accelerate)
+    p.map_ops(img_ops, **args)
     return p.transform(sc.reader())
 
 
