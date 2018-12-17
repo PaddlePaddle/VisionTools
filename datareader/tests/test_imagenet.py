@@ -20,8 +20,14 @@ def main(acc=True):
         obj = cPickle.loads(v)
         return obj['image'], obj['label']
 
-    imagenet.g_settings['accelerate'] = acc
     pre_maps = [_parse_kv]
+    args = {}
+    args['cpp_xmap'] = False
+    args['worker_num'] = 10
+    args['buffer_size'] = 1000
+    args['use_process'] = True
+    args['use_sharedmem'] = True
+    imagenet.g_settings['worker_args'] = args
     val_reader = imagenet.val(val_uri, pre_maps=pre_maps)
     ct = 0
     prev_ct = 0

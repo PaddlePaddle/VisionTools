@@ -94,7 +94,10 @@ class Builder(object):
     """ a builder to configure and create pyTransformer from C++
     """
 
-    def __init__(self, thread_num=1, queue_limit=1000):
+    def __init__(self, thread_num=1, queue_limit=None):
+        if queue_limit is None:
+            queue_limit = 1000
+
         self.reset()
         self._conf['thread_num'] = thread_num
         self._conf['worker_queue_limit'] = queue_limit
@@ -111,6 +114,12 @@ class Builder(object):
         """ init with user's configs
         """
         self._conf = conf
+        return self
+
+    def set_conf(self, k, v):
+        """ set configuration items
+        """
+        self._conf[k] = v
         return self
 
     def decode(self, to_rgb=None):
@@ -309,8 +318,14 @@ class Keeper(object):
             o.stop()
 
 
-def fast_xmap_readers(reader, builder, buffer_size=1000, \
-        with_label=True, post_mapper=None):
+def xmap_reader(reader, planner, buffer_size=1000, \
+        worker_num=16, with_label=True, post_mapper=None, **kwargs):
+    logger.debug('not used params in pytransformer.xmap_reader:[%s]' %
+                 (str(kwargs)))
+
+    planner.set_conf('thread_num', worker_num)
+    planner.set_conf('worker_queue_limit', buffer_size)
+
     def _mapper(r):
         if post_mapper is not None:
             return post_mapper(r)
@@ -340,10 +355,10 @@ def fast_xmap_readers(reader, builder, buffer_size=1000, \
             return _mapper(sample)
 
     def _sync_reader():
-        fast_transformer = builder.build(with_meta=True)
-        keeper = Keeper(fast_transformer)
+        cpp_transformer = planner.build(with_meta=True)
+        keeper = Keeper(cpp_transformer)
 
-        fast_transformer.start()
+        cpp_transformer.start()
         count = 0
         for r in reader():
             img = r[0]
@@ -354,10 +369,10 @@ def fast_xmap_readers(reader, builder, buffer_size=1000, \
                 label = r[1]
 
             meta = r[2:] if with_label else r[1:]
-            fast_transformer.put(img, label, meta)
+            cpp_transformer.put(img, label, meta)
             count += 1
             if count >= buffer_size:
-                r = _fetch_data(fast_transformer)
+                r = _fetch_data(cpp_transformer)
                 if r is False:
                     return
                 elif r is True:
@@ -367,7 +382,7 @@ def fast_xmap_readers(reader, builder, buffer_size=1000, \
                     yield r
         logging.debug('queue count %s buffer_size %s', count, buffer_size)
         for i in range(count):
-            r = _fetch_data(fast_transformer)
+            r = _fetch_data(cpp_transformer)
             if r is False:
                 return
             elif r is True:
@@ -376,6 +391,20 @@ def fast_xmap_readers(reader, builder, buffer_size=1000, \
                 yield r
 
     return _sync_reader
+
+
+class CppXmap(object):
+    def __init__(self, planner, worker_num=16, \
+        buffer_size=1000, pre_feed=None, **kwargs):
+        self.args = {}
+        for k, v in locals().items():
+            if k not in ['self', 'kwargs']:
+                self.args[k] = v
+
+        self.args.update(kwargs)
+
+    def __call__(self, reader):
+        return xmap_reader(reader, **self.args)
 
 
 #/* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
