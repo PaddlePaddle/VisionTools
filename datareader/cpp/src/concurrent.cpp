@@ -15,7 +15,7 @@
  */
 
 #include "include/concurrent.h"
-#include <pthread.h>
+//#include <pthread.h>
 #include "include/logger.h"
 #include "include/util.h"
 

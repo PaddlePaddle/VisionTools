@@ -14,15 +14,18 @@
 # limitations under the License.
 #
 # function
-#   a python wrapper C++ class 'pyTransformer'
+#   a python wrapper C++ class 'CTransformer'
 """
 
 import os
 import sys
 import logging
+import json
 
 logger = logging.getLogger(__name__)
-from .libpytransform import pyTransformer
+from .libpytransform import CyProcessor
+from .libpytransform import CyTransformer
+from .libpytransform import TransformerException
 
 #ref to 'include/opencv2/imgproc.hpp' for detail
 interpolation_flags = {
@@ -38,26 +41,26 @@ interpolation_flags = {
 
 
 class PyTransformer(object):
-    """ a wrapper for 'pyTransformer' implemented in C++
+    """ a wrapper for 'CyTransformer' implemented in C++
     """
 
-    def __init__(self, transformer, conf, with_meta=False):
-        self._transformer = transformer
-        self._conf = conf.copy()
+    def __init__(self, transformer, with_meta=False):
+        self._cytransformer = transformer
+        self._conf = {}
         self._buffer = {}
         self._id = 0
         self._with_meta = with_meta  #whether allowed to meta to pass through
 
     def start(self):
-        """ start the underling pyTransformer
+        """ start the underling CyTransformer
         """
-        return self._transformer.start()
+        return self._cytransformer.start()
 
     def get(self, ctx=None):
-        """ get a transformed data from underling pyTransformer
+        """ get a transformed data from underling CyTransformer
         """
         ctx = {} if ctx is None else ctx
-        img, label = self._transformer.get(ctx)
+        img, label = self._cytransformer.get(ctx)
         if img is None or not self._with_meta:
             return img, label
 
@@ -67,11 +70,11 @@ class PyTransformer(object):
         return img, label, meta
 
     def put(self, image, label, meta=None):
-        """ put a sample to pyTransformer
+        """ put a sample to CyTransformer
         """
         label = str(label) if type(label) is not str else label
         id = self._id
-        self._transformer.put(image, label, {'id': id})
+        self._cytransformer.put(image, label, {'id': id})
 
         if self._with_meta:
             assert id not in self._buffer
@@ -85,41 +88,32 @@ class PyTransformer(object):
             self._id = 0
 
     def stop(self):
-        """ stop pyTransformer (just indicate to stop)
+        """ stop CTransformer (just indicate to stop)
         """
-        self._transformer.stop()
+        self._cytransformer.stop()
 
 
-class Builder(object):
-    """ a builder to configure and create pyTransformer from C++
-    """
-
-    def __init__(self, thread_num=1, queue_limit=None):
-        if queue_limit is None:
-            queue_limit = 1000
-
+class ImageOpConf(object):
+    def __init__(self):
         self.reset()
-        self._conf['thread_num'] = thread_num
-        self._conf['worker_queue_limit'] = queue_limit
-        self._conf['swapaxis'] = 0
 
     def reset(self):
-        """ reset
+        """ clear all operators
         """
-        self._conf = {'thread_num': 1, 'worker_queue_limit': 1000}
         self._ops = []
         return self
 
-    def init(self, conf):
-        """ init with user's configs
-        """
-        self._conf = conf
-        return self
+    def lua(self, lua_script, tochw=False):
+        """ add op which is implemented by lua code in 'lua_script'
 
-    def set_conf(self, k, v):
-        """ set configuration items
+        Args:
+            @lua_script (str): file name to a script or lua code in str
+            @tochw (bool): whether convert to 'chw' from 'hwc' for final image
         """
-        self._conf[k] = v
+        self._ops.append(("lua_op", {
+            "lua_script": lua_script,
+            "tochw": int(tochw)
+        }))
         return self
 
     def decode(self, to_rgb=None):
@@ -279,25 +273,105 @@ class Builder(object):
         return self
 
     def to_chw(self):
-        self._conf['swapaxis'] = 1
+        self._ops.append(("tochw", {"value": 1}))
+        return self
+
+    def build_ops_conf(self):
+        """ build operators conf for creating a image process from C++
+        """
+        assert len(self._ops) > 0, "no operators added"
+
+        ops_conf = []
+        for op_name, op_conf in self._ops:
+            conf = {'op_name': op_name}
+            conf.update(op_conf)
+            ops_conf.append({k: str(v) for k, v in conf.items()})
+        return ops_conf
+
+    def __str__(self):
+        op_info = ['[%s:%s]' % (n, json.dumps(c)) for n, c in self._ops]
+        ret = 'ImageOpConf has operators:{%s}' % (','.join(op_info))
+        return ret
+
+
+class Builder(ImageOpConf):
+    """ a builder to configure and create CTransformer from C++
+    """
+
+    def __init__(self, thread_num=1, queue_limit=None):
+        super(Builder, self).__init__()
+        if queue_limit is None:
+            queue_limit = 1000
+
+        self.reset()
+        self._conf['thread_num'] = thread_num
+        self._conf['worker_queue_limit'] = queue_limit
+        self._conf['swapaxis'] = 0
+
+    def reset(self):
+        """ reset
+        """
+        super(Builder, self).reset()
+        self._conf = {'thread_num': 1, 'worker_queue_limit': 1000}
+        return self
+
+    def init(self, conf):
+        """ init with user's configs
+        """
+        self._conf = conf
+        return self
+
+    def set_conf(self, k, v):
+        """ set configuration items
+        """
+        self._conf[k] = v
         return self
 
     def build(self, with_meta=False):
-        """ create C++ pyTransformer from current configuration
+        """ create C++ CTransformer from current configuration
 
         Args:
             None
 
         Return:
-            PyTransformer instance which provide [start, get, put, stop] interfaces
+            CTransformer instance which provide [start, get, put, stop] interfaces
         """
         assert len(self._ops) > 0, "no ops added for this transformer"
-        t = pyTransformer(self._conf)
-        for op_name, op_conf in self._ops:
-            t.add_op(op_name, op_conf)
 
-        return PyTransformer(t, {'conf': self._conf,
-                                 'ops': self._ops}, with_meta)
+        ops_conf = self.build_ops_conf()
+        cf = {k: str(v) for k, v in self._conf.items()}
+        ctransformer = CyTransformer(cf, ops_conf)
+        return PyTransformer(ctransformer, with_meta)
+
+
+class PyProcessor(ImageOpConf):
+    def __init__(self):
+        super(PyProcessor, self).__init__()
+        self._cyprocessor = None
+
+    def reset(self):
+        """ clear all ops
+        """
+        super(PyProcessor, self).reset()
+        self._cyprocessor = None
+        return self
+
+    def _init(self):
+        """ init CyProcessor
+        """
+        ops_conf = self.build_ops_conf()
+        self._cyprocessor = CyProcessor(ops_conf)
+        return self._cyprocessor
+
+    def __call__(self, image, label=None):
+        if self._cyprocessor is None:
+            self._init()
+
+        if label is None:
+            img, _ = self._cyprocessor.process(image, '')
+            return img
+        else:
+            return self._cyprocessor.process(image, str(label))
 
 
 class Keeper(object):
@@ -313,7 +387,6 @@ class Keeper(object):
         self._resources.append(o)
 
     def __del__(self):
-        logging.debug('stop transform resource')
         for o in self._resources:
             o.stop()
 
@@ -336,9 +409,10 @@ def xmap_reader(reader, planner, buffer_size=1000, \
         ctx = {}
         try:
             img, label, meta = transformer.get(ctx)
-        except Exception as e:
-            logger.warn('failed to call transformer.get')
-            return False
+        except TransformerException as exp:
+            logger.warn('failed to fetch result from transformer.get with '\
+                'exception:%s' % (str(exp)))
+            return True
 
         if img is None:
             return False

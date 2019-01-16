@@ -15,36 +15,24 @@
  **/
 
 #pragma once
-#include <stdint.h>
-#include <string>
-#include <vector>
+#include "baseprocess.h"
+#include "lua_util.h"
+#include "transformer.h"
 
 namespace vistool {
 
-int randInt(int min, int max);
-
-float randFloat(float min, float max);
-
-std::string formatString(const char* fmt, ...);
-
-std::vector<std::string> splitString(const std::string& s,
-                                     const std::string& delim);
-
-int64_t now_usec();
-
-class BufLogger {
+class LuacvProcess : public IProcessor {
 public:
-  explicit BufLogger(bool log_out = true);
-  ~BufLogger();
+  LuacvProcess();
+  ~LuacvProcess();
 
-  bool append(const char* fmt, ...);
+  virtual int init(const ops_conf_t &ops);
 
-  inline const std::string& get() const { return this->_buffer; }
+  virtual int process(const transformer_input_data_t &input,
+                      transformer_output_data_t &output);
 
-private:
-  int64_t _start_ts;
-  bool _log_out;
-  std::string _buffer;
+protected:
+  LuaStateMgr *_lua_mgr;
+  int _tochw;
 };
-
-};  // namespace vistool
+};

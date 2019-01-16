@@ -23,6 +23,31 @@ class OperatorParamError(ValueError):
     pass
 
 
+class LuaProcessImage(object):
+    """ an lua operator which can execute any code in lua env
+    """
+
+    def __init__(self, lua_script, tochw=False):
+        self._lua_script = lua_script
+        self._tochw = tochw
+        self._pyprocessor = None
+
+    def __call__(self, img):
+        assert len(self._lua_script) > 0, 'invalid lua script'
+
+        if self._pyprocessor is None:
+            from ..pytransformer import PyProcessor
+            self._pyprocessor = PyProcessor()
+            self._pyprocessor.lua(self._lua_script, tochw=self._tochw)
+
+        res, _ = self._pyprocessor(img)
+        return res
+
+    def make_plan(self, planner):
+        assert len(self._lua_script) > 0, 'invalid lua script'
+        planner.lua(self._lua_script, tochw=self._tochw)
+
+
 class NormalizeImage(object):
     def __init__(self, scale=None, mean=None, std=None, order='chw'):
         self.scale = scale if scale is not None else 1.0 / 255.0

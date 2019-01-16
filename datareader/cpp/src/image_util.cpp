@@ -19,7 +19,8 @@
 #include <vector>
 
 #include "include/image_util.h"
-#ifdef USETURBOJPEG
+#include "logger.h"
+#ifdef WITH_TURBOJPEG
 #include "turbojpeg.h"
 #endif
 
@@ -86,7 +87,29 @@ int saveImage(const cv::Mat &img, const std::string &fname) {
   return 0;
 }
 
-#ifdef USETURBOJPEG
+std::string encodeImage(const std::string &format,
+                        cv::Mat &image,
+                        std::vector<int> param) {
+  std::vector<unsigned char> data_encode;
+  if (!cv::imencode(format, image, data_encode, param)) {
+    LOG(WARNING) << "fail to call cv::imencode";
+    return "";
+  }
+  std::string encoded(data_encode.begin(), data_encode.end());
+  return encoded;
+}
+
+cv::Mat decodeImage(const cv::Mat &buf, int mode) {
+  cv::Mat decoded;
+  int ret = decode(
+      (const char *)buf.data, buf.total() * buf.elemSize(), &decoded, mode);
+  if (IMPROC_OK != ret) {
+    LOG(WARNING) << "fail to decode image with ret:" << ret;
+  }
+  return decoded;
+}
+
+#ifdef WITH_TURBOJPEG
 static cv::Mat decodeJpeg(const char *buffer, int bufferlen, int iscolor) {
   tjhandle handle = tjInitDecompress();
 
@@ -129,7 +152,6 @@ static bool is_jpeg_format(const char *buffer, int bufferlen) {
   char format[2] = {0xFF, 0xD8};
   return checkformat(buffer, bufferlen, format, 2);
 }
-
 #endif
 
 IMPROC_ERR_CODE_TYPE decode(const char *buf,
@@ -138,7 +160,7 @@ IMPROC_ERR_CODE_TYPE decode(const char *buf,
                             int mode) {
   IMPROC_ERR_CODE_TYPE ret = IMPROC_OK;
   cv::Mat dec;
-#ifdef USETURBOJPEG
+#ifdef WITH_TURBOJPEG
   bool isjpeg = is_jpeg_format(buf, bufsize);
   if (isjpeg) {
     dec = decodeJpeg(buf, bufsize, mode);
@@ -146,7 +168,8 @@ IMPROC_ERR_CODE_TYPE decode(const char *buf,
     dec = cv::imdecode(std::vector<char>(buf, buf + bufsize), mode);
   }
 #else
-  dec = cv::imdecode(std::vector<char>(buf, buf + bufsize), mode);
+  cv::Mat bufmat(1, bufsize, CV_8U, (void *)buf);
+  dec = cv::imdecode(bufmat, mode);
 #endif
 
   if (dec.channels() == 3) {
@@ -210,6 +233,30 @@ IMPROC_ERR_CODE_TYPE flip(const cv::Mat &img, int flip_code, cv::Mat *result) {
     ret = IMPROC_INVALID_PARAM;
   }
   return ret;
+}
+
+std::string mat2str(const cv::Mat &mat) {
+  std::string result;
+  size_t size = mat.total() * mat.elemSize();
+  result.resize(size);
+  std::memcpy((void *)result.data(), mat.data, size);
+  return result;
+}
+
+void tochw(const cv::Mat &mat, std::string *outstr) {
+  if (mat.channels() == 1) {
+    std::memcpy((void *)outstr->data(), mat.data, mat.total() * mat.elemSize());
+  } else {
+    std::vector<cv::Mat> channels(mat.channels());
+    int imgsz = mat.rows * mat.cols;
+    cv::split(mat, channels);
+    for (size_t i = 0; i < channels.size(); i++) {
+      const char *src = outstr->data() + i * imgsz;
+      std::memcpy((void *)src,
+                  channels[i].data,
+                  channels[i].total() * channels[i].elemSize());
+    }
+  }
 }
 
 };  // namespace vistool

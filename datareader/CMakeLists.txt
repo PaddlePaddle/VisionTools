@@ -19,7 +19,14 @@ set(DATAREADER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 project(datareader)
 
-option(BUILD_TURBO_JPEG "Build with libturbojpeg" ON)
+option(WITH_TURBOJPEG "Build with libturbojpeg" OFF)
+option(WITH_LUA "Build with lua support" ON)
+option(DEVELOP_MODE "Build python module in develop mode" OFF)
+
+set(MODULE_BUILD_TYPE "bdist_wheel")
+if (DEVELOP_MODE)
+    SET(MODULE_BUILD_TYPE "develop")
+endif()
 
 message(STATUS "CXX compiler: ${CMAKE_CXX_COMPILER}, version: "
         "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
@@ -31,15 +38,18 @@ set(THIRD_PARTY_PATH "${CMAKE_BINARY_DIR}/third_party" CACHE STRING
 
 include(external/gflags)    # download, build, install gflags
 include(external/glog)      # download, build, install glog
-include(external/opencv)      # download, build, install opencv
+include(external/opencv)    # download, build, install opencv
 
-if (BUILD_TURBO_JPEG)
-    include(external/turbojpeg) # download, build, install turbojpeg
+if (WITH_LUA)
+    message("build with lua support")
+    include(external/lua)       # download, build, install lua
+    include(external/luacv)     # download, build, install luacv
 endif()
 
-set(THIRD_LIBS_INSTALL_PATH "${THIRD_PARTY_PATH}")
-set(USE_TURBO_JPEG "${BUILD_JPEG_TURBO}")
-set(WHL_BUILD_CMD "python ${DATAREADER_SOURCE_DIR}/setup.py build bdist_wheel")
+if (WITH_TURBOJPEG)
+    message("build with turbojpeg support")
+    include(external/turbojpeg) # download, build, install turbojpeg
+endif()
 
 find_package(PythonLibs 2.7 REQUIRED)
 if (PYTHONLIBS_FOUND)
@@ -49,16 +59,17 @@ else()
     message("not found python package")
 endif()
 
-message("build wheel ${WHL_BUILD_CMD}")
 message("dependent libs:${external_project_dependencies}")
+message("python module build type: ${MODULE_BUILD_TYPE}")
 add_custom_target(
     datareader_wheel
     ALL COMMAND env
-        THIRD_LIBS_INSTALL_PATH=${THIRD_LIBS_INSTALL_PATH}
-        BUILD_JPEG_TURBO=${BUILD_JPEG_TURBO}
+        THIRD_LIBS_INSTALL_PATH=${THIRD_PARTY_PATH}
+        WITH_TURBOJPEG=${WITH_TURBOJPEG}
+        WITH_LUA=${WITH_LUA}
         PYTHON_LIBRARIES=${PYTHON_LIBRARIES}
         WHEEL_DIST_DIR=${CMAKE_CURRENT_BINARY_DIR}
-        ${DATAREADER_SOURCE_DIR}/build.sh 
+        ${DATAREADER_SOURCE_DIR}/build.sh ${MODULE_BUILD_TYPE}
     WORKING_DIRECTORY ${DATAREADER_SOURCE_DIR}
     DEPENDS ${external_project_dependencies}
 )

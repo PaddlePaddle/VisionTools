@@ -19,8 +19,7 @@
  *  this module provides multi-threading interfaces
  **/
 
-#ifndef DATAREADER_CPP_INCLUDE_CONCURRENT_H_
-#define DATAREADER_CPP_INCLUDE_CONCURRENT_H_
+#pragma once
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -261,5 +260,4 @@ protected:
   std::vector<std::thread *> _threads_info;
 };
 
-};      // namespace vistool
-#endif  // DATAREADER_CPP_INCLUDE_CONCURRENT_H_
+};  // namespace vistool

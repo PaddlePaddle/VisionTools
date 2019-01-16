@@ -27,10 +27,12 @@ op_names = [
     'RandFlipImage',
     'RandDistortColor',
     'ToCHWImage',
+    'LuaProcessImage',
 ]
 
 from . import pil_ops
 from . import opencv_ops
+from . import base
 
 # default class of operators to use
 default_class = 'pil'
@@ -48,8 +50,11 @@ def _op_proxy(name):
             op_class = default_class
         op_class = op_class.lower()
 
-        op_mod = pil_ops if op_class == 'pil' else opencv_ops
-        op = getattr(op_mod, name, None)
+        op = getattr(base, name, None)
+        if op is None:
+            op_mod = pil_ops if op_class == 'pil' else opencv_ops
+            op = getattr(op_mod, name, None)
+
         assert op is not None, "not found %s in %s" % (name, op_mod.__name__)
         return op(*args, **kwargs)
 

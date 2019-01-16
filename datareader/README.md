@@ -9,6 +9,7 @@ Usually this pipeline includes data operations like `load/parse/decode/resize/cr
   * easy to compose flexible pipelines of preprocessing
   * fast image processing implemented in c++
   * stream data processing for large datasets which maybe not possible to store in local disk
+  * support lua embedding for image processing
 
 ---
 ### How to install
@@ -26,5 +27,6 @@ Usually this pipeline includes data operations like `load/parse/decode/resize/cr
     - `python tools/jpeg2seqfile.py sample.list seqfile.bin` #transform jpeg files to seqfile
 
   * performance test
-    - `python tests/test_imagenet.py` #use cpp accelerated processing
-    - `python tests/test_imagenet.py --accelerate=0` #use python processing
+    - `python python/datareader/test/test_imagenet.py -method=python` #process images in python
+    - `python python/datareader/test/test_imagenet.py -method=cpp` #process images in cpp
+    - `python python/datareader/test/test_imagenet.py -method=lua` #process images in lua

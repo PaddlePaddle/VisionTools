@@ -47,8 +47,10 @@ ExternalProject_Add(
                     -DBUILD_ZLIB:BOOL=ON
                     -DBUILD_PERF_TESTS=OFF
                     -DWITH_1394:BOOL=OFF
-                    -DWITH_FFMPEG:BOOL=OFF
+                    -DWITH_IPP:BOOL=ON
+                    -DWITH_WEBP:BOOL=ON
                     -DWITH_EIGEN:BOOL=ON
+                    -DWITH_FFMPEG:BOOL=OFF
                     -DWITH_GSTREAMER:BOOL=OFF
                     -DWITH_GTK:BOOL=OFF
                     -DWITH_UNICAP:BOOL=OFF
