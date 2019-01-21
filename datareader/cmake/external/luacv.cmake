@@ -38,7 +38,7 @@ ExternalProject_Add(
     GIT_REPOSITORY  ${LUACV_REPOSITORY}
     GIT_TAG         ${LUACV_TAG}
     PREFIX          ${LUACV_SOURCES_DIR}
-    UPDATE_COMMAND  ""
+    UPDATE_COMMAND  cp ${LUACV_SOURCES_DIR}/src/extern_luacv/src/raw_bind_generated.inc.full ${LUACV_SOURCES_DIR}/src/extern_luacv/src/raw_bind_generated.inc
     CMAKE_ARGS      -DTHIRD_PARTY_PATH=${THIRD_PARTY_PATH}
                     -DLUA_INSTALL_DIR=${LUA_INSTALL_DIR}
                     -DOPENCV_INSTALL_DIR=${OPENCV_INSTALL_DIR}

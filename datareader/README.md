@@ -14,8 +14,11 @@ Usually this pipeline includes data operations like `load/parse/decode/resize/cr
 ---
 ### How to install
 
+  * prepare requirements
+    - install cython: `pip install cython`
+
   * build wheel
-    `mkdir output && cd output && cmake .. && make`
+    `mkdir output && cd output && cmake ../ && make`
 
   * install wheel
     `python install output/dist/datareader-0.0.1-cp27-cp27mu-linux_x86_64.whl`
@@ -30,3 +33,10 @@ Usually this pipeline includes data operations like `load/parse/decode/resize/cr
     - `python python/datareader/test/test_imagenet.py -method=python` #process images in python
     - `python python/datareader/test/test_imagenet.py -method=cpp` #process images in cpp
     - `python python/datareader/test/test_imagenet.py -method=lua` #process images in lua
+
+---
+### FAQ
+
+  1. cmake error: *Could NOT find PythonLibs (missing: PYTHON_LIBRARIES PYTHON_INCLUDE_DIRS)*
+   ```
+    cmake ../ -DPYTHON_INCLUDE_DIR=/path/to/your/python/include -DPYTHON_LIBRARIES=/path/to/your/python/lib/libpython2.7.so

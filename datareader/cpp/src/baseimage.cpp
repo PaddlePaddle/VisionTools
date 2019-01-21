@@ -123,4 +123,5 @@ IProcessor *IProcessor::create(const std::string &classname,
   LOG(FATAL) << "failed to create IProcessor with classname:" << classname;
   return nullptr;
 }
+
 };  // namespace vistool

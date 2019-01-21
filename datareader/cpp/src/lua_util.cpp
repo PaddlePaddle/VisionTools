@@ -32,19 +32,22 @@ KAGUYA_BINDINGS(luac_basic) {
   kaguya::function("mat2str", mat2str);
 }
 
-static int initLuaEnv(lua_State *lua_s, const std::string &lua_script) {
+static int initLuaEnv(lua_State *lua_s,
+                      const std::string &lua_script,
+                      bool isfile) {
   kaguya::State state(lua_s);
   state.openlibs();
   state.openlib("luac_cv", luaopen_cv);
   state.openlib("luac_basic", vistool::luaopen_luac_basic);
 
   bool succeed = false;
-  if (lua_script.find("\n") != std::string::npos) {
-    LOG(INFO) << "load 'lua_main' from script code: " << lua_script.size();
-    succeed = state.dostring(lua_script.c_str());
-  } else {
-    LOG(INFO) << "load 'lua_main' from script file:" << lua_script;
+  if (isfile) {
+    LOG(INFO) << "load 'lua_main' from file:" << lua_script;
     succeed = state.dofile(lua_script.c_str());
+  } else {
+    LOG(INFO) << "load 'lua_main' from script code with size: "
+              << lua_script.size();
+    succeed = state.dostring(lua_script.c_str());
   }
   if (!succeed) {
     LOG(FATAL) << "load 'lua_main' failed with error:"
@@ -57,19 +60,28 @@ static int initLuaEnv(lua_State *lua_s, const std::string &lua_script) {
 
 class LuaStateMgrImpl : public LuaStateMgr {
 public:
-  LuaStateMgrImpl(const std::string &lua_script, int state_num = 1)
-      : _lua_script(lua_script), _states(state_num) {
+  LuaStateMgrImpl(int state_num = 1) : _lua_script(""), _states(state_num) {}
+
+  int init(const std::string &lua_script, bool isfile) {
+    int state_num = _states.capacity();
+    _lua_script = lua_script;
+    if (state_num <= 0) {
+      LOG(FATAL) << "invalid state_num:" << state_num;
+      return -1;
+    }
+
     for (int i = 0; i < state_num; i++) {
       lua_State *s = luaL_newstate();
-      if (0 != initLuaEnv(s, _lua_script)) {
+      if (0 != initLuaEnv(s, _lua_script, isfile)) {
         lua_close(s);
         s = NULL;
         LOG(FATAL) << "failed to create lua states:" << i;
-        break;
+        return -2;
       } else {
         _states.put(s);
       }
     }
+    return 0;
   }
 
   virtual ~LuaStateMgrImpl() {
@@ -88,8 +100,14 @@ private:
   BlockingQueue<lua_State *> _states;
 };
 
-LuaStateMgr *LuaStateMgr::create(const std::string &lua_script, int state_num) {
-  LuaStateMgrImpl *mgr = new LuaStateMgrImpl(lua_script, state_num);
+LuaStateMgr *LuaStateMgr::create(const std::string &lua_script,
+                                 bool isfile,
+                                 int state_num) {
+  LuaStateMgrImpl *mgr = new LuaStateMgrImpl(state_num);
+  if (mgr->init(lua_script, isfile)) {
+    delete mgr;
+    mgr = nullptr;
+  }
   return mgr;
 }
 };

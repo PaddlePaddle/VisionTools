@@ -37,7 +37,9 @@ public:
   LuaStateMgr(){};
   virtual ~LuaStateMgr(){};
 
-  static LuaStateMgr *create(const std::string &lua_script, int state_num = 1);
+  static LuaStateMgr *create(const std::string &lua_script,
+                             bool isfile,
+                             int state_num = 1);
 
   static void destroy(LuaStateMgr *mgr) { delete mgr; }
 

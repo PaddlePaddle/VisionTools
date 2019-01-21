@@ -27,8 +27,9 @@ class LuaProcessImage(object):
     """ an lua operator which can execute any code in lua env
     """
 
-    def __init__(self, lua_script, tochw=False):
-        self._lua_script = lua_script
+    def __init__(self, lua_fname='', lua_code='', tochw=False):
+        self._lua_fname = lua_fname
+        self._lua_code = lua_code
         self._tochw = tochw
         self._pyprocessor = None
 
@@ -38,14 +39,17 @@ class LuaProcessImage(object):
         if self._pyprocessor is None:
             from ..pytransformer import PyProcessor
             self._pyprocessor = PyProcessor()
-            self._pyprocessor.lua(self._lua_script, tochw=self._tochw)
+            self._pyprocessor.lua(lua_fname=self._lua_fname,
+                                  lua_code=self._lua_code,
+                                  tochw=self._tochw)
 
         res, _ = self._pyprocessor(img)
         return res
 
     def make_plan(self, planner):
-        assert len(self._lua_script) > 0, 'invalid lua script'
-        planner.lua(self._lua_script, tochw=self._tochw)
+        planner.lua(lua_fname=self._lua_fname,
+                    lua_code=self._lua_code,
+                    tochw=self._tochw)
 
 
 class NormalizeImage(object):

@@ -127,8 +127,11 @@ def make_reader(mode,
 
     args = copy.deepcopy(g_settings['worker_args'])
     args.update(kwargs)
-    if 'lua_script' in kwargs and kwargs['lua_script']:
-        img_ops = [ops.LuaProcessImage(kwargs['lua_script'], tochw=True)]
+    if 'lua_fname' in kwargs and kwargs['lua_fname']:
+        img_ops = [
+            ops.LuaProcessImage(
+                lua_fname=kwargs['lua_fname'], tochw=True)
+        ]
     else:
         img_ops = train_image_mapper(
         ) if mode == 'train' else test_image_mapper()

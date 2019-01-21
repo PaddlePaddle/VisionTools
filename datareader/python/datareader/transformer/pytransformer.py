@@ -103,15 +103,21 @@ class ImageOpConf(object):
         self._ops = []
         return self
 
-    def lua(self, lua_script, tochw=False):
-        """ add op which is implemented by lua code in 'lua_script'
+    def lua(self, lua_fname='', lua_code='', tochw=False):
+        """ add op which is implemented by lua code 'lua_fname' or 'lua_code'
 
         Args:
-            @lua_script (str): file name to a script or lua code in str
+            @lua_fname(str): file path to a lua script 
+            @lua_code(str): a lua code string
             @tochw (bool): whether convert to 'chw' from 'hwc' for final image
         """
+        assert type(lua_fname) is str and type(
+            lua_code) is str, "invalid type of params for lua op"
+        assert len(lua_fname) > 0 or len(lua_code) > 0, 'invalid lua script'
+
         self._ops.append(("lua_op", {
-            "lua_script": lua_script,
+            "lua_fname": lua_fname,
+            "lua_code": lua_code,
             "tochw": int(tochw)
         }))
         return self

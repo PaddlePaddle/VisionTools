@@ -57,7 +57,8 @@ class TestPyTransformer(unittest.TestCase):
     def setUpClass(cls):
         """ setup
         """
-        cls.test_jpg = 'tests/data/test.jpg'
+        work_dir = os.path.dirname(os.path.realpath(__file__))
+        cls.test_jpg = os.path.join(work_dir, 'test.jpg')
         with open(cls.test_jpg, 'rb') as f:
             cls.img_data = f.read()
 
@@ -107,10 +108,23 @@ class TestPyTransformer(unittest.TestCase):
         """
         img = self.img_data
         proc = PyProcessor()
-        proc.lua(lua_ops['decode'])
+        proc.lua(lua_code=lua_ops['decode'])
         result, label = proc(img, '123')
         self.assertEqual(label, '123')
         self.assertEqual(len(result.shape), 3)
+
+    def test_decode_diff(self):
+        """ test diff
+        """
+        img = self.img_data
+        proc = PyProcessor()
+        proc.lua(lua_code=lua_ops['decode'], tochw=False)
+        lua_result, _ = proc(img, '')
+
+        proc.reset()
+        proc.decode(to_rgb=True)
+        result, _ = proc(img, '')
+        self.assertEqual(np.sum(np.abs(lua_result - result)), 0)
 
     def test_lua_resize(self):
         """ test lua resize
@@ -118,7 +132,7 @@ class TestPyTransformer(unittest.TestCase):
         img = self.img_data
         proc = PyProcessor()
 
-        proc.lua(lua_ops['resize_224'], tochw=True)
+        proc.lua(lua_code=lua_ops['resize_224'], tochw=True)
         lua_result, _ = proc(img, '')
         self.assertEqual(lua_result.shape, (3, 224, 224))
 

@@ -32,18 +32,17 @@ def main(argv):
     if argv['method'] == 'python':
         args['cpp_xmap'] = False
         args['use_process'] = argv['use_process']
-        if argv['use_process']:
-            args['use_sharedmem'] = argv['use_sharedmem']
+        args['use_sharedmem'] = argv['use_sharedmem']
     else:
         args['cpp_xmap'] = True
         args['use_process'] = False
         if argv['method'] == 'lua':
-            lua_fname = argv['lua_script']
+            lua_fname = argv['lua_fname']
 
     args['worker_num'] = argv['worker_num']
     imagenet.g_settings['worker_args'] = args
     pre_maps = [_parse_kv]
-    val_reader = imagenet.val(val_uri, pre_maps=pre_maps, lua_script=lua_fname)
+    val_reader = imagenet.val(val_uri, pre_maps=pre_maps, lua_fname=lua_fname)
 
     ct = 0
     prev_ct = 0
@@ -63,7 +62,7 @@ def main(argv):
                                             1000 * (time.time() - start_ts)))
 
     train_reader = imagenet.train(
-        train_uri, pre_maps=pre_maps, lua_script=lua_fname)
+        train_uri, pre_maps=pre_maps, lua_fname=lua_fname)
     ct = 0
     prev_ct = 0
     ts = time.time()
@@ -105,21 +104,26 @@ def parse_args():
         '-val_data', default=val_uri, help='file path to validation data')
 
     parser.add_argument(
-        '-lua_script',
+        '-lua_fname',
         default=os.path.join(work_dir, 'test.lua'),
         help='lua script file for image process if use "lua" method')
 
     parser.add_argument(
-        '-worker_num', default=16, help='workers to process the images')
+        '-worker_num',
+        default=16,
+        type=int,
+        help='workers to process the images, default to 16')
 
     parser.add_argument(
         '-use_process',
         default=False,
-        help='whether to use process or thread as workers')
+        action='store_true',
+        help='whether to use process or thread as workers, default to False')
     parser.add_argument(
         '-use_sharedmem',
         default=False,
-        help='whether to use shared memory as IPC when using process as workers'
+        action='store_true',
+        help='whether to use shared memory as IPC when using process as workers, default to False'
     )
 
     return vars(parser.parse_args())

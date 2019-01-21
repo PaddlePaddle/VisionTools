@@ -51,10 +51,16 @@ int LuacvProcess::init(const ops_conf_t &ops) {
     return -1;
   }
 
-  std::string lua_script = confhelper.get("lua_script");
+  std::string lua_script = confhelper.get("lua_fname");
+  bool isfile = true;
   if (lua_script == "") {
-    LOG(FATAL) << "not found 'lua_script' conf";
-    return -1;
+    lua_script = confhelper.get("lua_code");
+    if (lua_script == "") {
+      LOG(FATAL) << "not found any 'lua_fname' or 'lua_code' param in 'lua_op'";
+    } else {
+      LOG(INFO) << "found 'lua_code' conf";
+      isfile = false;
+    }
   }
 
   confhelper.get("tochw", &_tochw, 0);
@@ -63,8 +69,12 @@ int LuacvProcess::init(const ops_conf_t &ops) {
   int state_num = 1;
   confhelper.get("state_num", &state_num, state_num);
   LOG(INFO) << "create lua manager with state_num:" << state_num;
-  _lua_mgr = LuaStateMgr::create(lua_script, state_num);
-  return 0;
+  _lua_mgr = LuaStateMgr::create(lua_script, isfile, state_num);
+  if (_lua_mgr) {
+    return 0;
+  } else {
+    return -1;
+  }
 }
 
 typedef std::vector<cv::Mat> lua_param_type_t;

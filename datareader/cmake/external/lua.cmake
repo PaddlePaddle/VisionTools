@@ -20,7 +20,6 @@ SET(LUA_INSTALL_DIR ${THIRD_PARTY_PATH}/lua)
 SET(LUA_BIN "${LUA_INSTALL_DIR}/bin/lua" CACHE FILEPATH "lua binary." FORCE)
 SET(LUA_PKG "lua-5.3.5.tar.gz")
 SET(LUA_URL "http://www.lua.org/ftp/${LUA_PKG}")
-#SET(LUA_URL "http://10.88.151.33:8070/${LUA_PKG}")
 
 SET(LUA_INCLUDE_DIR "${LUA_INSTALL_DIR}/include" CACHE PATH "lua include directory." FORCE)
 set(LUA_LIBRARIES "${LUA_INSTALL_DIR}/lib/liblua.a" CACHE FILEPATH "LUA_LIBRARIES" FORCE)
@@ -34,9 +33,8 @@ ExternalProject_Add(
     UPDATE_COMMAND  tar -zxvf ${LUA_SOURCES_DIR}/src/${LUA_PKG} 
     BINARY_DIR ${LUA_SOURCES_DIR}/src/extern_lua
     CONFIGURE_COMMAND ""
-    #CONFIGURE_COMMAND pwd && ./configure --prefix=${LUA_INSTALL_DIR}
-    BUILD_COMMAND make linux CFLAGS=-fPIC LDFLAGS=-lncurses INSTALL_TOP=${LUA_INSTALL_DIR}
-    INSTALL_COMMAND make linux install LDFLAGS=-lncurses INSTALL_TOP=${LUA_INSTALL_DIR}
+    BUILD_COMMAND make posix CFLAGS=-fPIC LDFLAGS=-lncurses INSTALL_TOP=${LUA_INSTALL_DIR}
+    INSTALL_COMMAND make posix install LDFLAGS=-lncurses INSTALL_TOP=${LUA_INSTALL_DIR}
 )
 
 ADD_LIBRARY(lua STATIC IMPORTED GLOBAL)

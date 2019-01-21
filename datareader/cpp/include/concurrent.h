@@ -52,6 +52,8 @@ public:
 
   inline int length() const { return _queue.size(); }
 
+  inline int capacity() const { return _queue_limit; }
+
   /**
    * @brief get an element from this queue, which will be timed out
    *        if 'wait_ms' is greater than 0

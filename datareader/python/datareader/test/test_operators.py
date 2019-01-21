@@ -49,7 +49,8 @@ class TestOps(unittest.TestCase):
     def setUpClass(cls):
         """ setup
         """
-        with open('test_img.jpg', 'rb') as f:
+        work_dir = os.path.dirname(os.path.realpath(__file__))
+        with open(os.path.join(work_dir, 'test.jpg'), 'rb') as f:
             cls.img_data = f.read()
 
     @classmethod

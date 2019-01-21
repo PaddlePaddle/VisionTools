@@ -223,19 +223,18 @@ def handle_worker(in_queue, out_queue, mapper):
     out_queue.put(None, meta=end)
 
 
-def xmap_reader(reader, mapper, worker_num=16, buffer_size=1000,\
-        use_process=True, mem_size=None, ret_imgshape=(3, 224, 224), \
-        ret_imgtype='uint8', pre_feed=None, **kwargs):
+def _xmap_reader(reader, mapper, data_size, worker_num=16, buffer_size=1000,\
+        use_process=True, mem_size=None, pre_feed=None, **kwargs):
     """
-    Use multiple processes to executing 'mapper' with sample from 'reader',
+    Executing 'mapper' using multiple processes with sample from 'reader',
     the processed sample will be yield out from the returned '_reader'.
 
     notes:
         * The inputs come from 'reader', and each input is tuple like this 
             (image, label, xxx), the 'image' must be a instance of str.
         * The outputs come from 'mapper(input)', and each output is also 
-            a tuple like this (proc_image, label, xxx), the 'proc_image' 
-            must be a instance of numpy.ndarray
+            a tuple like this (result_image, label, xxx), the 'result_image' 
+            must be a instance of str.
 
     task of main process:
         1, create shared-memory-based input/output queues for communication
@@ -259,13 +258,10 @@ def xmap_reader(reader, mapper, worker_num=16, buffer_size=1000,\
     Args:
         @reader (callable): iterator maker for the sample data
         @mapper (callable): a function to process a sample
+        @data_size (int): result image size in bytes
         @worker_num (int): number of workers to execute 'mapper(sample)'
         @buffer_size (int): queue size for input and output queues
         @mem_size (int): the size of allocated shared memory used in queues
-        @ret_imgshape (tuple): the shape of first element from mapper's result
-                                which is the processed image with type of 
-                                numpy.ndarray
-        @ret_imgtype (str): the type of ndarray, eg:'uint8', 'int32', 'float32'
         @pre_feed (int): how many to feed samples to workers before fetching result
 
     Returns:
@@ -273,16 +269,6 @@ def xmap_reader(reader, mapper, worker_num=16, buffer_size=1000,\
     """
     logger.debug('not used params in shared_xmap.xmap_reader:[%s]' %
                  (str(kwargs)))
-
-    data_size = reduce(lambda x, y: x * y, ret_imgshape)
-    if ret_imgtype.endswith('8'):
-        data_size *= 1
-    elif ret_imgtype.endswith('32'):
-        data_size *= 4
-    elif ret_imgtype.endswith('64'):
-        data_size *= 8
-    else:
-        raise ValueError('invalid ret_imgtype[%s]' % (ret_imgtype))
 
     def _feed_sample(iter, inq, num=1):
         # feed one sample to worker
@@ -309,26 +295,11 @@ def xmap_reader(reader, mapper, worker_num=16, buffer_size=1000,\
 
         data = buf.get()
         buf.free()
-        if data and ret_imgshape:
-            data = np.frombuffer(data, dtype=ret_imgtype)
-            data = data.reshape(ret_imgshape)
+        #if data and ret_imgshape:
+        #    data = np.frombuffer(data, dtype=ret_imgtype)
+        #    data = data.reshape(ret_imgshape)
 
         return concate_as_tuple(data, meta)
-
-    def _wrapped_mapper(sample):
-        result = mapper(sample)
-        img = result[0]
-        if img is not None and ret_imgshape:
-            assert isinstance(img, np.ndarray), \
-                'the type of first field from mapper must be numpy.ndarray'
-            assert img.shape == ret_imgshape, 'invalid shape[real:%s,expected:%s]'\
-                ' of processed image' % (str(img.shape), str(ret_imgshape))
-            assert img.dtype == ret_imgtype, 'invalid type[real:%s,expected:%s]'\
-                ' of processed image from worker' % (img.dtype, ret_imgtype)
-            img = img.tobytes()
-            assert len(img) == data_size, 'invalid size[real:%d, expect:%d] of '\
-                'processed image from worker' % (len(img), data_size)
-        return concate_as_tuple(img, result[1:])
 
     pre_feed = buffer_size / 2 if pre_feed is None else pre_feed
     assert pre_feed <= buffer_size, 'invalid pre_feed[%d]' % (pre_feed)
@@ -346,7 +317,7 @@ def xmap_reader(reader, mapper, worker_num=16, buffer_size=1000,\
 
         # start handle_workers to do cpu-intensive tasks
         target = handle_worker
-        args = (in_queue, out_queue, _wrapped_mapper)
+        args = (in_queue, out_queue, mapper)
         workers = []
         for i in xrange(worker_num):
             worker = get_worker(
@@ -387,5 +358,71 @@ def xmap_reader(reader, mapper, worker_num=16, buffer_size=1000,\
                 finished += 1
             else:
                 yield result
+
+    return _reader
+
+
+def xmap_reader(reader,
+                mapper,
+                ret_imgshape=(3, 224, 224),
+                ret_imgtype='uint8',
+                **kwargs):
+    """
+    Apply 'mapper' function to every sample from 'reader', 
+    the 'mapper' should accept a tuple (image_str, label) 
+    as it's arguments and return a another tuple (image_ndarray, label), 
+    and will return the mapped reader
+
+    notes:
+        * The inputs come from 'reader', and each input is a tuple 
+            (image, label, xxx), the 'image' must be a instance of str.
+        * The outputs come from 'mapper(input)', and each output is also 
+            a tuple like this (result_image, label, xxx), the 'result_image' 
+            must be a np.ndarray with shape 'ret_imgshape' and type 'ret_imgtype'
+
+
+    Args:
+        @ret_imgshape (tuple): the shape of first element from mapper's result
+                                which is the processed image with type of 
+                                numpy.ndarray
+        @ret_imgtype (str): the type of ndarray, eg:'uint8', 'int32', 'float32'
+
+    Returns:
+        @reader (callable): iterator maker for the processed sample data
+    """
+
+    data_size = reduce(lambda x, y: x * y, ret_imgshape)
+    if ret_imgtype.endswith('8'):
+        data_size *= 1
+    elif ret_imgtype.endswith('32'):
+        data_size *= 4
+    elif ret_imgtype.endswith('64'):
+        data_size *= 8
+    else:
+        raise ValueError('invalid ret_imgtype[%s]' % (ret_imgtype))
+
+    def _serializeable_mapper(sample):
+        result = mapper(sample)
+        img = result[0]
+        if img is not None and ret_imgshape:
+            assert isinstance(img, np.ndarray), \
+                'the type of first field from mapper must be numpy.ndarray'
+            assert img.shape == ret_imgshape, 'invalid shape[real:%s,expected:%s]'\
+                ' of processed image' % (str(img.shape), str(ret_imgshape))
+            assert img.dtype == ret_imgtype, 'invalid type[real:%s,expected:%s]'\
+                ' of processed image from worker' % (img.dtype, ret_imgtype)
+            img = img.tobytes()
+            assert len(img) == data_size, 'invalid size[real:%d, expect:%d] of '\
+                'processed image from worker' % (len(img), data_size)
+        return concate_as_tuple(img, result[1:])
+
+    rd = _xmap_reader(reader, _serializeable_mapper, data_size, **kwargs)
+
+    def _reader():
+        for image, label in rd():
+            image = np.frombuffer(image, dtype=ret_imgtype)
+            image = image.reshape(ret_imgshape)
+
+            yield (image, label)
 
     return _reader
