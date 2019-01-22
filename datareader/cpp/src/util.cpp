@@ -24,7 +24,7 @@
 
 #include "include/logger.h"
 #include "include/util.h"
-
+#define random rand
 namespace vistool {
 
 int randInt(int min, int max) {
@@ -47,7 +47,7 @@ float randFloat(float min, float max) {
   return static_cast<float>(min + (max - min) * d_r);
 }
 
-std::string string_format(const char* fmt, ...) {
+std::string formatString(const char* fmt, ...) {
   std::string str;
   va_list vl;
   va_start(vl, fmt);
@@ -124,5 +124,4 @@ bool BufLogger::append(const char* fmt, ...) {
     return false;
   }
 }
-
 };  // namespace vistool

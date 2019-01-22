@@ -29,57 +29,90 @@ from Cython.Distutils import build_ext
 print("### build datareader wheel with args:%s" % (' '.join(sys.argv)))
 curfolder = os.path.dirname(os.path.abspath(__file__))
 cpp_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cpp')
-use_turbojpeg = True
-if os.environ.get('USE_TURBO_JPEG', '') == '0':
-    use_turbojpeg = False
+with_turbo = False
+if os.environ.get('WITH_TURBOJPEG', '') == '1':
+    with_turbo = True
 
-third_libs = os.environ.get('THIRD_LIBS_INSTALL_PATH', 'third_party')
-if third_libs == 'third_party':
-    third_libs = os.path.join(curfolder, third_libs)
+with_lua = True
+if os.environ.get('WITH_LUA', '') == '0':
+    with_lua = False
 
-opencvincludedir = os.path.join(third_libs, 'opencv/include')
-opencvlibdir = os.path.join(third_libs, 'opencv/lib')
-jpegturboincludedir = os.path.join(third_libs, 'turbojpeg/include')
-jpegturbolibdir = os.path.join(third_libs, 'turbojpeg/lib')
+third_lib_root = os.environ.get('THIRD_LIBS_INSTALL_PATH', 'third_party')
+if third_lib_root == 'third_party':
+    third_lib_root = os.path.join(curfolder, third_lib_root)
 
-pythonlibdir = os.environ.get('PYTHON_LIBRARIES', '')
-if pythonlibdir == '':
-    pythonlibdir = os.path.join(third_libs, 'python27/lib')
-else:
-    if os.path.isfile(pythonlibdir):
-        pythonlibdir = os.path.dirname(pythonlibdir)
 
-opencvlibs = [
-    "opencv_world", "IlmImf", "ittnotify", "libjasper", "libpng", "libtiff",
-    "libwebp", "zlib"
-]
+def prepare_depdent_libs(third_lib_root, with_turbo, with_lua):
+    """ prepare dependent libraries
+    """
+    include_dirs = []
+    link_dirs = []
+    link_libs = []
 
-if not use_turbojpeg:
-    opencvlibs += ["libjpeg"
-                   ]  #include it for libturbojpeg.a has also included this
-    linklibs = [
-        os.path.join(opencvlibdir, 'lib' + lib + '.a') for lib in opencvlibs
+    include_dirs += [os.path.join(third_lib_root, 'opencv/include')]
+    link_dirs += [os.path.join(third_lib_root, 'opencv/lib')]
+    include_dirs += [os.path.join(third_lib_root, 'turbojpeg/include')]
+    link_dirs += [os.path.join(third_lib_root, 'turbojpeg/lib')]
+
+    opencv_install_dir = os.path.join(third_lib_root, 'opencv')
+    opencvlibs = [
+        "opencv_world", "IlmImf", "ittnotify", "libjasper", "libpng",
+        "libtiff", "libwebp", "zlib"
     ]
-else:
-    linklibs = [
-        os.path.join(opencvlibdir, 'lib' + lib + '.a') for lib in opencvlibs
-    ]
-    linklibs += [os.path.join(jpegturbolibdir, 'libturbojpeg.a')]
+    if with_turbo:
+        link_libs = [
+            os.path.join(third_lib_root, 'opencv/lib', 'lib' + lib + '.a')
+            for lib in opencvlibs
+        ]
+        link_libs += [
+            os.path.join(third_lib_root, 'turbojpeg/lib/libturbojpeg.a')
+        ]
+    else:
+        opencvlibs += ["libjpeg"]
+        link_libs += [
+            os.path.join(third_lib_root, 'opencv/lib', 'lib' + lib + '.a')
+            for lib in opencvlibs
+        ]
 
-#use xlinker instead of libraries, to avoid link error
-extralinkflag = ["-fopenmp"] + ['-Xlinker', "-("] + linklibs \
-          + ['-Xlinker', "-)"] \
-          + [r"-Wl,--rpath=$ORIGIN", "-Wl,--rpath=$ORIGIN/../so", "-Wl,-z,origin"]
+    if with_lua:
+        include_dirs += [os.path.join(third_lib_root, 'lua/include')]
+        link_dirs += [os.path.join(third_lib_root, 'lua/lib')]
+        link_libs += [os.path.join(third_lib_root, 'lua/lib/liblua.a')]
+
+        include_dirs += [os.path.join(third_lib_root, 'luacv/include')]
+        link_dirs += [os.path.join(third_lib_root, 'luacv/lib')]
+        link_libs += [os.path.join(third_lib_root, 'luacv/lib/libluacv.a')]
+
+    pythonlibdir = os.environ.get('PYTHON_LIBRARIES', '')
+    if pythonlibdir == '':
+        pythonlibdir = os.path.join(third_lib_root, 'python27/lib')
+    else:
+        if os.path.isfile(pythonlibdir):
+            pythonlibdir = os.path.dirname(pythonlibdir)
+    link_dirs += [pythonlibdir]
+
+    return include_dirs, link_dirs, link_libs
 
 
 def make_transform_ext(name, pyxfile, ext_root):
     """ make python extension about libpytransform
     """
-    srcfiles = [pyxfile] + glob.glob(os.path.join(ext_root, 'src', '*.cpp'))
-
     macros = [('NDEBUG', '1')]
-    if use_turbojpeg:
-        macros += [('USETURBOJPEG', None)]
+    srcfiles = [pyxfile] + glob.glob(os.path.join(ext_root, 'src', '*.cpp'))
+    if with_lua:
+        macros += [('WITH_LUA', None)]
+    else:
+        srcfiles = filter(lambda n: n.find('lua') < 0, srcfiles)
+
+    if with_turbo:
+        macros += [('WITH_TURBOJPEG', None)]
+
+    include_dirs, link_dirs, link_libs = prepare_depdent_libs(
+        third_lib_root, with_turbo, with_lua)
+    include_dirs += [ext_root, ext_root + '/include']
+    extra_link_flag = ["-fopenmp"] + ['-Xlinker', "-("] + link_libs \
+              + ['-Xlinker', "-)"] \
+              + [r"-Wl,--rpath=$ORIGIN", "-Wl,--rpath=$ORIGIN/../so", "-Wl,-z,origin"]
     return Extension(
         name=name,
         sources=srcfiles,
@@ -87,12 +120,9 @@ def make_transform_ext(name, pyxfile, ext_root):
         extra_compile_args=[
             "-O3", "-msse4.2", "-fopenmp", "-std=c++11", "-fPIC"
         ],
-        extra_link_args=extralinkflag,
-        include_dirs=[
-            ext_root, ext_root + '/include', ext_root + '/src',
-            opencvincludedir, jpegturboincludedir
-        ],
-        library_dirs=[opencvlibdir, pythonlibdir, jpegturbolibdir],
+        extra_link_args=extra_link_flag,
+        include_dirs=include_dirs,
+        library_dirs=link_dirs,
         language='c++')
 
 

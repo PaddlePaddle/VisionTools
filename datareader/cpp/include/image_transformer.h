@@ -22,17 +22,18 @@
  *  the data results will be put back to python space
  **/
 
-#ifndef DATAREADER_CPP_INCLUDE_IMAGE_TRANSFORMER_H_
-#define DATAREADER_CPP_INCLUDE_IMAGE_TRANSFORMER_H_
+#pragma once
 
 #include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
-
+#include "imageprocess.h"
 #include "include/concurrent.h"
 #include "include/transformer.h"
-
+#include "logger.h"
+#include "opencv2/opencv.hpp"
+#include "util.h"
 namespace vistool {
 
 class ImageTransformer : public Transformer {
@@ -42,12 +43,7 @@ public:
 
   virtual int init(const kv_conf_t &conf);
 
-  /**
-   * @brief add a transformation operation to this transformer,
-   *        now, supported ops are 'decode/resize/crop/random_crop/
-   *        rotate/flip/swapaxis'
-   */
-  virtual int add_op(const std::string &op_name, const kv_conf_t &conf);
+  virtual int set_processor(IProcessor *p);
 
   /**
    * @brief launch this transformer to work
@@ -101,15 +97,13 @@ private:
   int _put_task(ITask *t);
 
 private:
+  IProcessor *_imgprocess;
   int _id;
   std::atomic<std::uint64_t> _in_num;
   std::atomic<std::uint64_t> _out_num;
-  std::vector<kv_conf_t> _ops;
   std::string _state;
   ThreadPool _workers;
   BlockingQueue<transformer_output_data_t *> _output_queue;
-  int _swapaxis;
 };
 
-};      // namespace vistool
-#endif  // DATAREADER_CPP_INCLUDE_IMAGE_TRANSFORMER_H_
+};  // namespace vistool

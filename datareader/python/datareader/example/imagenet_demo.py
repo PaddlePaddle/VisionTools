@@ -56,7 +56,7 @@ def train_image_mapper(img_size=None, normalize=None, default_class='pil'):
     img_ops += [ops.RotateImage(10, rand=True)]
     img_ops += [ops.RandCropImage(img_size)]
     img_ops += [ops.RandFlipImage()]
-    img_ops += [ops.ToCHWImage(op_class='pil')]
+    img_ops += [ops.ToCHWImage()]
 
     if normalize:
         img_ops += [ops.NormalizeImage()]
@@ -76,7 +76,7 @@ def test_image_mapper(img_size=None, normalize=None, default_class='pil'):
     img_ops = [ops.DecodeImage()]
     img_ops += [ops.ResizeImage(resize_short=img_size)]
     img_ops += [ops.CropImage(img_size)]
-    img_ops += [ops.ToCHWImage(op_class='pil')]
+    img_ops += [ops.ToCHWImage()]
     if normalize:
         img_ops += [ops.NormalizeImage()]
 
@@ -127,7 +127,15 @@ def make_reader(mode,
 
     args = copy.deepcopy(g_settings['worker_args'])
     args.update(kwargs)
-    img_ops = train_image_mapper() if mode == 'train' else test_image_mapper()
+    if 'lua_fname' in kwargs and kwargs['lua_fname']:
+        img_ops = [
+            ops.LuaProcessImage(
+                lua_fname=kwargs['lua_fname'], tochw=True)
+        ]
+    else:
+        img_ops = train_image_mapper(
+        ) if mode == 'train' else test_image_mapper()
+
     for m in maps:
         p.map(m)
     p.map_ops(img_ops, **args)

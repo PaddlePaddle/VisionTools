@@ -14,9 +14,7 @@
  * limitations under the License.
  **/
 
-#ifndef DATAREADER_CPP_INCLUDE_LOGGER_H_
-#define DATAREADER_CPP_INCLUDE_LOGGER_H_
-
+#pragma once
 #include <iostream>
 #include <sstream>
 namespace vistool {
@@ -74,4 +72,3 @@ protected:
 };  // namespace vistool
 
 #define LOG(loglevel) Logger(__FILE__, __LINE__, loglevel).getstream()
-#endif  // DATAREADER_CPP_INCLUDE_LOGGER_H_

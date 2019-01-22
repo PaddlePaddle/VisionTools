@@ -14,9 +14,7 @@
  * limitations under the License.
  **/
 
-#ifndef DATAREADER_CPP_INCLUDE_IMAGE_UTIL_H_
-#define DATAREADER_CPP_INCLUDE_IMAGE_UTIL_H_
-
+#pragma once
 #include <opencv/cxcore.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -38,6 +36,12 @@ enum IMPROC_ERR_CODE_TYPE {
 int readImage(const std::string &fname, std::vector<char> *buf);
 
 int saveImage(const cv::Mat &img, const std::string &fname);
+
+std::string encodeImage(const std::string &format,
+                        cv::Mat &image,
+                        std::vector<int> param);
+
+cv::Mat decodeImage(const cv::Mat &buf, int mode);
 
 IMPROC_ERR_CODE_TYPE decode(const char *buf,
                             size_t bufsize,
@@ -62,6 +66,7 @@ IMPROC_ERR_CODE_TYPE rotate(const cv::Mat &img,
 
 IMPROC_ERR_CODE_TYPE flip(const cv::Mat &img, int flip_code, cv::Mat *result);
 
-};  // namespace vistool
+std::string mat2str(const cv::Mat &mat);
 
-#endif  // DATAREADER_CPP_INCLUDE_IMAGE_UTIL_H_
+void tochw(const cv::Mat &mat, std::string *outstr);
+};  // namespace vistool

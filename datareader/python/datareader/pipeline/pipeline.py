@@ -393,8 +393,8 @@ class Pipeline(object):
                         yield i
                 except Exception as e:
                     stack_info = traceback.format_exc()
-                    logger.warn('exception occured in preprocessing pipeline "\
-                            "with stack info[%s]' % (stack_info))
+                    logger.warn('exception occured in preprocessing pipeline '\
+                            'with stack info[%s]' % (stack_info))
                     raise e
                 if not infinite:
                     break

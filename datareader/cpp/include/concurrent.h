@@ -19,8 +19,7 @@
  *  this module provides multi-threading interfaces
  **/
 
-#ifndef DATAREADER_CPP_INCLUDE_CONCURRENT_H_
-#define DATAREADER_CPP_INCLUDE_CONCURRENT_H_
+#pragma once
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -52,6 +51,8 @@ public:
   inline bool is_empty() { return _queue.empty(); }
 
   inline int length() const { return _queue.size(); }
+
+  inline int capacity() const { return _queue_limit; }
 
   /**
    * @brief get an element from this queue, which will be timed out
@@ -261,5 +262,4 @@ protected:
   std::vector<std::thread *> _threads_info;
 };
 
-};      // namespace vistool
-#endif  // DATAREADER_CPP_INCLUDE_CONCURRENT_H_
+};  // namespace vistool
