@@ -14,14 +14,25 @@
 
 cmake_minimum_required(VERSION 3.0)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-set(DATAREADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(DATAREADER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+set(VISREADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(VISREADER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-project(datareader)
+project(visreader)
 
-option(WITH_TURBOJPEG "Build with libturbojpeg" OFF)
-option(WITH_LUA "Build with lua support" ON)
-option(DEVELOP_MODE "Build python module in develop mode" OFF)
+macro(boolean_number var)
+  if(${var})
+    set(${var} 1)
+  else()
+    set(${var} 0)
+  endif()
+endmacro()
+
+option(WITH_TURBOJPEG "Build with libturbojpeg" TRUE)
+boolean_number(WITH_TURBOJPEG)
+option(WITH_LUA "Build with lua support" TRUE)
+boolean_number(WITH_LUA)
+option(DEVELOP_MODE "Build python module in develop mode" FALSE)
+boolean_number(DEVELOP_MODE)
 
 set(MODULE_BUILD_TYPE "bdist_wheel")
 if (DEVELOP_MODE)
@@ -51,12 +62,11 @@ if (WITH_TURBOJPEG)
     include(external/turbojpeg) # download, build, install turbojpeg
 endif()
 
-if (NOT DEFINED PYTHON_LIBRARIES OR NOT DEFINED PYTHON_INCLUDE_DIRS)
+if (NOT DEFINED PYTHON_LIBRARIES)
     message("try to locate python libraries")
     find_package(PythonLibs 2.7 REQUIRED)
     if (PYTHONLIBS_FOUND)
         message("python libs: ${PYTHON_LIBRARIES}")
-        message("python inc: ${PYTHON_INCLUDE_DIRS}")
     else()
         message(SEND_ERROR "not found python libraries, please specify it")
     endif()
@@ -65,14 +75,14 @@ endif()
 message("dependent libs:${external_project_dependencies}")
 message("python module build type: ${MODULE_BUILD_TYPE}")
 add_custom_target(
-    datareader_wheel
+    visreader_wheel
     ALL COMMAND env
         THIRD_LIBS_INSTALL_PATH=${THIRD_PARTY_PATH}
         WITH_TURBOJPEG=${WITH_TURBOJPEG}
         WITH_LUA=${WITH_LUA}
         PYTHON_LIBRARIES=${PYTHON_LIBRARIES}
         WHEEL_DIST_DIR=${CMAKE_CURRENT_BINARY_DIR}
-        ${DATAREADER_SOURCE_DIR}/build.sh ${MODULE_BUILD_TYPE}
-    WORKING_DIRECTORY ${DATAREADER_SOURCE_DIR}
+        ${VISREADER_SOURCE_DIR}/build.sh ${MODULE_BUILD_TYPE}
+    WORKING_DIRECTORY ${VISREADER_SOURCE_DIR}
     DEPENDS ${external_project_dependencies}
 )

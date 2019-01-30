@@ -126,19 +126,20 @@ def make_transform_ext(name, pyxfile, ext_root):
         language='c++')
 
 
-modname = 'datareader'
-version = '0.0.1'
+modname = 'visreader'
+version = '1.0.0'
 
 #make cpp extension
 lib_modname = modname + '.transformer.libpytransform'
 pyxfile = os.path.join(cpp_root, 'libpytransform.pyx')
 extensions = [make_transform_ext(lib_modname, pyxfile, cpp_root)]
 
-#build package of datareader
+#build package of visreader
 pysource = 'python'
 setup(
     name=modname,
     version=version,
+    url='https://github.com/PaddlePaddle/VisionTools.git',
     description="a package for data loading and preprocessing in training model",
     packages=find_packages(where=pysource),
     package_dir={'': pysource},

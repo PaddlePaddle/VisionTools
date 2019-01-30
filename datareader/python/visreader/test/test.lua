@@ -5,7 +5,9 @@ function lua_main(sample, str_sample)
     local img = sample[1]
     --local label = basic.mat2str(sample[2])
 
-    local dec = cv.imdecode(img, 1)
+    local dec = basic.imdecode(img, 1)
+    -- local mat = dec
+    -- print(mat.cols, mat.rows, mat:channels(), mat:total())
     local resizeimg = cv.Mat()
     cv.resize(dec, resizeimg, cv.Size(224, 224), 0, 0, cv.INTER_LINEAR)
 

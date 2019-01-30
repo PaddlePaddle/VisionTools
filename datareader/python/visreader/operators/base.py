@@ -176,11 +176,6 @@ def build(ops, worker_num=16, buffer_size=1000, cpp_xmap=False, \
             post_mapper=post_mapper)
     else:
         mapper = build_mapper(ops)
-        if use_sharedmem:
-            from ..pipeline.decorator import SharedXmap
-            return SharedXmap(mapper, worker_num=worker_num, \
-                buffer_size=buffer_size, **kwargs)
-        else:
-            from ..pipeline.decorator import Xmap
-            return Xmap(mapper, worker_num=worker_num, \
-                buffer_size=buffer_size, **kwargs)
+        from ..pipeline.decorator import Xmap
+        return Xmap(mapper, worker_num=worker_num, buffer_size=buffer_size, \
+                use_sharedmem=use_sharedmem, **kwargs)

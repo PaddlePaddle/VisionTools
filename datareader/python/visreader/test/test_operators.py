@@ -14,7 +14,7 @@ path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../')
 if path not in sys.path:
     sys.path.insert(0, path)
 
-import datareader.operators as ops
+import visreader.operators as ops
 
 
 def get_ops(img_size=224, op_class='pil', normalize=True):
