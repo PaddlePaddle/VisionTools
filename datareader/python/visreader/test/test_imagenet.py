@@ -7,7 +7,7 @@ path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../')
 if path not in sys.path:
     sys.path.insert(0, path)
 
-import datareader.example.imagenet_demo as imagenet
+import visreader.example.imagenet_demo as imagenet
 
 
 def _parse_kv(r):
@@ -58,8 +58,8 @@ def main(argv):
 
         ct += 1
 
-    print('total got %d samples in %dms' % (ct,
-                                            1000 * (time.time() - start_ts)))
+    print('total got %d val samples in %dms' % (ct, 1000 *
+                                                (time.time() - start_ts)))
 
     train_reader = imagenet.train(
         train_uri, pre_maps=pre_maps, lua_fname=lua_fname)

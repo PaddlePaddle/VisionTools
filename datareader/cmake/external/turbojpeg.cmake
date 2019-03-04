@@ -23,14 +23,6 @@ SET(TURBO_JPEG_LIBRARIES "${TURBO_JPEG_LIB_DIR}/libturbojpeg.a" CACHE FILEPATH "
 SET(TURBO_JPEG_REPOSITORY "https://github.com/libjpeg-turbo/libjpeg-turbo.git")
 SET(TURBO_JPEG_TAG "2.0.0")
 
-SET(HEADER_ROOT "${TURBO_JPEG_SOURCES_DIR}/src/extern_turbojpeg")
-SET(TURBO_JPEG_HEADERS
-    jconfig.h
-    ${HEADER_ROOT}/jerror.h
-    ${HEADER_ROOT}/jmorecfg.h
-    ${HEADER_ROOT}/jpeglib.h
-    ${HEADER_ROOT}/turbojpeg.h)
-
 INCLUDE_DIRECTORIES(${TURBO_JPEG_INCLUDE_DIR})
 
 include(external/nasm)
@@ -47,9 +39,6 @@ ExternalProject_Add(
     GIT_REPOSITORY  ${TURBO_JPEG_REPOSITORY}
     GIT_TAG         ${TURBO_JPEG_TAG}
     PREFIX          ${TURBO_JPEG_SOURCES_DIR}
-    UPDATE_COMMAND  sed -i "s/#define DLLEXPORT$/#define DLLEXPORT __attribute__((visibility(\"default\")))/g" ${TURBO_JPEG_SOURCES_DIR}/src/extern_turbojpeg/turbojpeg.h
-    BUILD_COMMAND   make
-    INSTALL_COMMAND mkdir -p ${TURBO_JPEG_LIB_DIR} && mkdir -p ${TURBO_JPEG_INCLUDE_DIR} && cp libturbojpeg.a ${TURBO_JPEG_LIBRARIES} && cp ${TURBO_JPEG_HEADERS} ${TURBO_JPEG_INCLUDE_DIR}
     CMAKE_ARGS      -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
                     -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
                     -DCMAKE_C_FLAGS=${CMAKE_CFLAGS}
