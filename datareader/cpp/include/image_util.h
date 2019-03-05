@@ -68,5 +68,5 @@ IMPROC_ERR_CODE_TYPE flip(const cv::Mat &img, int flip_code, cv::Mat *result);
 
 std::string mat2str(const cv::Mat &mat);
 
-void tochw(const cv::Mat &mat, std::string *outstr);
+int tochw(const cv::Mat &mat, std::string *outstr);
 };  // namespace vistool

@@ -243,20 +243,31 @@ std::string mat2str(const cv::Mat &mat) {
   return result;
 }
 
-void tochw(const cv::Mat &mat, std::string *outstr) {
+int tochw(const cv::Mat &mat, std::string *outstr) {
   if (mat.channels() == 1) {
-    std::memcpy((void *)outstr->data(), mat.data, mat.total() * mat.elemSize());
+    int size = mat.total() * mat.elemSize();
+    outstr->resize(size);
+    std::memcpy((void *)outstr->data(), mat.data, size);
   } else {
     std::vector<cv::Mat> channels(mat.channels());
     int imgsz = mat.rows * mat.cols;
     cv::split(mat, channels);
+    size_t coppied = 0;
     for (size_t i = 0; i < channels.size(); i++) {
-      const char *src = outstr->data() + i * imgsz;
-      std::memcpy((void *)src,
-                  channels[i].data,
-                  channels[i].total() * channels[i].elemSize());
+      const char *out = outstr->data() + i * imgsz;
+      size_t sz = channels[i].total() * channels[i].elemSize();
+      coppied += sz;
+      if (sz * channels.size() != outstr->size()) {
+        LOG(FATAL) << "invalid size[" << sz << "] of splits in tochw";
+        return -1;
+      } else if (coppied > outstr->size()) {
+        LOG(FATAL) << "invalid copy size[" << coppied << "] of splits in tochw";
+        return -2;
+      }
+      std::memcpy((void *)out, channels[i].data, sz);
     }
   }
+  return 0;
 }
 
 };  // namespace vistool

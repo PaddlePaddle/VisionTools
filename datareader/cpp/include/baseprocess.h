@@ -48,6 +48,15 @@ private:
 
 struct transformer_input_data_t {
   transformer_input_data_t() : id(0) {}
+  ~transformer_input_data_t() {}
+
+  transformer_input_data_t &operator=(const transformer_input_data_t &from) {
+    this->id = from.id;
+    this->data = from.data;
+    this->label = from.label;
+    return *this;
+  }
+
   unsigned int id;
   std::string data;
   std::string label;
@@ -55,12 +64,23 @@ struct transformer_input_data_t {
 
 struct transformer_output_data_t {
   transformer_output_data_t() : id(0), err_no(0) {}
+  ~transformer_output_data_t() {}
+
+  transformer_output_data_t &operator=(const transformer_output_data_t &from) {
+    this->id = from.id;
+    this->err_no = from.err_no;
+    this->err_msg = from.err_msg;
+    this->shape = from.shape;
+    this->label = from.label;
+    this->data = from.data;
+    return *this;
+  }
+
   unsigned int id;
   int err_no;
   std::string err_msg;
-
-  std::string label;
   std::vector<int> shape;
+  std::string label;
   std::string data;
 };
 

@@ -43,8 +43,8 @@ cdef extern from "transformer.h" namespace "vistool":
         unsigned int id
         int err_no
         string err_msg
-        string label
         vector[int] shape
+        string label
         string data
         
 cdef extern from "baseprocess.h" namespace "vistool":
