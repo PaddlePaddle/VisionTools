@@ -346,7 +346,7 @@ int ImageProcess::process(const transformer_input_data_t &input,
   output.err_no = err_no;
   output.err_msg = err_msg;
   if (!err_no) {
-    int size = result.total() * result.elemSize();
+    size_t size = result.total() * result.elemSize();
     output.data.resize(size);
     if (_swapaxis) {
       output.shape.push_back(result.channels());
@@ -365,8 +365,8 @@ int ImageProcess::process(const transformer_input_data_t &input,
 
   logger.append("[output:{size:%d,err_no:%d,err_msg:[%s]}]",
                 output.data.size(),
-                err_no,
-                err_msg.c_str());
+                output.err_no,
+                output.err_msg.c_str());
 
   return 0;
 }

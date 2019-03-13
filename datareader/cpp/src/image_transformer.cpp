@@ -203,9 +203,9 @@ int ImageTransformer::put(int id,
   transformer_input_data_t *input = t->get_input();
   input->id = id;
   input->data.resize(image_len);
-  memcpy(&input->data[0], image, image_len);
+  std::memcpy(&input->data[0], image, image_len);
   input->label.resize(label_len);
-  memcpy(&input->label[0], label, label_len);
+  std::memcpy(&input->label[0], label, label_len);
 
   int ret = this->_put_task(t);
   if (ret) {
@@ -251,6 +251,7 @@ int ImageTransformer::get(transformer_output_data_t *output) {
     _out_num++;
     *output = *out;
     delete out;
+    out = NULL;
     return 0;
   } else {
     LOG(INFO) << "tranformer has stoped and got nothing";
