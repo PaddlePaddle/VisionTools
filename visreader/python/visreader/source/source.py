@@ -46,7 +46,7 @@ class SourceMeta(object):
                  part_id=None,
                  part_num=None,
                  cache=None,
-                 infinite=False,
+                 pass_num=1,
                  to_dict=True):
         """ init
         """
@@ -60,7 +60,7 @@ class SourceMeta(object):
         self.part_id = part_id if part_id is not None else 0
         self.part_num = part_num if part_num is not None else 1
         self.cache = strip_spaces(cache)
-        self.infinite = infinite
+        self.pass_num = pass_num
         self.to_dict = to_dict
 
         if self.cache is not None:
@@ -146,31 +146,44 @@ class DataSource(object):
         raise NotImplementedError(
             'invalid callinig to _make_reader of DataSource')
 
-    def reader(self, infinite=None):
+    def reader(self, pass_num=None):
         """ get a reader of this source
 
         Args:
-            infinite (bool): whether repeat to iterate the data in this source
+            pass_num (int): number of times to replay data, 
+                            <= 0 means infinite
 
         Returns:
             iterator maker
         """
+        if pass_num is None:
+            pass_num = self.meta.pass_num
         rd = self._make_reader()
-        infinite = infinite if infinite is not None else self.meta.infinite
 
         def _reader():
+            ct = 0
             while True:
                 for i in rd():
                     yield i
+                ct += 1
 
-        return rd if not infinite else _reader
+                if pass_num > 0 and ct >= pass_num:
+                    break
+
+        return _reader
 
 
 def load(uri, filetype=None, part_id=None, part_num=None, **kwargs):
-    """ load data from local/afs/drepo, and return a reader,
-        and there are several others things need to be done:
-        1, partition the data if needed
-        2, cache data to local disk specified by 'cache' if needed
+    """ load data from local disk
+
+        TODO:
+            support hdfs and other source of data
+
+    Args:
+        @uri (str): location of data, eg: file://path/to/your/data
+        @filetype (str): 'seqfile' or 'textfile' according to your data format
+        @part_id (int): id of this node when partition the data
+        @part_num (int): number of nodes
 
     Returns:
         DataSource instance

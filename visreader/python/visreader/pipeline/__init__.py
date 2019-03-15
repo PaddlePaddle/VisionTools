@@ -17,4 +17,26 @@
 __all__ = ['decorator', 'Pipeline']
 
 from . import decorator
+from .. import source
 from .pipeline import Pipeline
+
+
+class Dataset(Pipeline):
+    """ a helper for load data and apply transformers
+    """
+
+    def __init__(self, sc):
+        super(Dataset, self).__init__()
+        self._sc = sc
+
+    @classmethod
+    def load(cls, *args, **kwargs):
+        """ load data from source
+        """
+        sc = source.load(*args, **kwargs)
+        return Dataset(sc)
+
+    def reader(self):
+        """ return sample-generator maker for this source
+        """
+        return self.transform(self._sc.reader())

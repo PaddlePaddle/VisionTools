@@ -275,36 +275,21 @@ def read_worker(reader, in_queue):
         in_queue.put(XmapEndSignal(stack_info, -1))
 
 
-# define a worker to read samples from reader to in_queue with order flag
-def order_read_worker(reader, in_queue):
-    """ order_read_worker
-    """
-    try:
-        in_order = 0
-        for i in reader():
-            in_queue.put((in_order, i))
-            in_order += 1
-    except Exception as e:
-        stack_info = traceback.format_exc()
-        end = XmapEndSignal(stack_info, -1)
-
-    in_queue.put(end)
-
-
 # define a worker to handle samples from in_queue by mapper
 # and put mapped samples into out_queue
-def handle_worker(in_queue, out_queue, mapper, flatmap):
+def handle_worker(in_queue, out_queue, mapper, order):
     """ handle_worker
     """
     sample = in_queue.get()
     while not isinstance(sample, XmapEndSignal):
         try:
-            if not flatmap:
-                r = mapper(sample)
-                out_queue.put(r)
+            if not order:
+                result = mapper(sample)
+                out_queue.put(result)
             else:
-                for r in mapper(sample):
-                    out_queue.put(r)
+                data, id = sample
+                result = mapper(data)
+                out_queue.put((result, id))
             sample = in_queue.get()
         except Exception as e:
             stack_info = traceback.format_exc()
@@ -319,7 +304,7 @@ class XMappedReader(object):
     def __init__(self, reader, mapper=None, worker_num=16, \
             buffer_size=1000, use_process=False, \
             shared_memsize=None, shared_pagesize=None, \
-            flatmap=False, pre_feed=None):
+            order=False, pre_feed=None):
         assert buffer_size > 0, "invalid buffer_size[%d] in XMappedReader" \
             % (buffer_size)
         if pre_feed is None:
@@ -330,7 +315,8 @@ class XMappedReader(object):
         self._inq, self._outq = self._init_queues(
             buffer_size, use_process, shared_memsize, shared_pagesize)
 
-        args = (self._inq, self._outq, mapper, flatmap)
+        self._order = order
+        args = (self._inq, self._outq, mapper, order)
         self._workers = self._init_workers(worker_num, use_process, \
                             handle_worker, args)
         self._worker_num = len(self._workers)
@@ -356,11 +342,18 @@ class XMappedReader(object):
             w.start()
         return workers
 
-    def _feed_sample(self, iter, inq, num=1):
+    def _feed_sample(self, iter, inq, feed_ctx, num=1):
+        order = feed_ctx['order']
+        id = feed_ctx['id']
         try:
             for i in xrange(num):
                 sample = iter.next()
+                if order:
+                    sample = (sample, id)
+                    id += 1
                 inq.put(sample)
+
+            feed_ctx['id'] = id
             return None
         except StopIteration as e:
             end = XmapEndSignal(errmsg='ok', errno=0)
@@ -379,7 +372,9 @@ class XMappedReader(object):
         inq = self._inq
         outq = self._outq
         pre_feed = self._pre_feed
-        end = self._feed_sample(iter, inq, num=pre_feed)
+        feed_ctx = {'id': 0, 'order': self._order}
+        fetch_ctx = {'id': 0, 'results': {}}
+        end = self._feed_sample(iter, inq, feed_ctx, num=pre_feed)
         self._finished_workers = 0
         while end is None:
             result = outq.get()
@@ -388,8 +383,20 @@ class XMappedReader(object):
                 end = result
                 break
             else:
-                yield result
-            end = self._feed_sample(iter, inq)
+                if not self._order:
+                    yield result
+                else:
+                    sample, id = result
+                    assert id not in fetch_ctx['results'], \
+                        "duplicated id[%d] in order mode" % (id)
+                    fetch_ctx['results'][id] = sample
+                    if id in fetch_ctx['results']:
+                        sample = fetch_ctx['results'][id]
+                        del fetch_ctx['results'][id]
+                        fetch_ctx['id'] += 1
+                        yield sample
+
+            end = self._feed_sample(iter, inq, feed_ctx)
 
         # no more task or failure happened, so notify all workers to exit
         if end.get_errno() != 0:
@@ -402,10 +409,26 @@ class XMappedReader(object):
             result = outq.get()
             if isinstance(result, XmapEndSignal):
                 if result._errno != 0:
-                    logger.warn('')
+                    logger.warn('worker exit with error[errno:%d,errmsg:%s]' \
+                        % (result._errno, result._errmsg))
                 self._finished_workers += 1
             else:
-                yield result
+                if not self._order:
+                    yield result
+                else:
+                    sample, id = result
+                    assert id not in fetch_ctx['results'], \
+                        "duplicated id[%d] in order mode" % (id)
+        while len(fetch_ctx['results'].keys()) > 0:
+            id = fetch_ctx['id']
+            if id in fetch_ctx['results']:
+                sample = fetch_ctx['results'][id]
+                del fetch_ctx['results'][id]
+                fetch_ctx['id'] += 1
+                yield sample
+            else:
+                logger.warn('not found result with id[%d]' % (id))
+                break
 
     def _notify_exit(self, end=None):
         """ notify worker to finish it's task and exit
@@ -433,33 +456,26 @@ class XMappedReader(object):
 def xmap_reader(reader, mapper=None, worker_num=16, \
         buffer_size=1000, use_process=False, \
         use_sharedmem=None, shared_memsize=None, shared_pagesize=None, \
-        flatmap=False, pre_feed=None, **kwargs):
+        order=False, pre_feed=None, **kwargs):
     """
     Use multiprocess to map samples from reader by a mapper defined by user.
     And this function contains a buffered decorator.
-    :param mapper:  a function to map sample.
-    :type mapper: callable
-    :param reader: the data reader to read from
-    :type reader: callable
-    :param worker_num: process number to handle original sample
-    :type worker_num: int
-    :param buffer_size: max buffer size
-    :type buffer_size: int
-    :param use_process: whether use process as workers
-    :type use_process: bool
-    :param shared_memsize: size of shared memory
-    :type shared_memsize: int
-    :param shared_pagesize: page size of shared memory
-    :type shared_pagesize: int
-    :return: the decarated reader
-    :rtype: callable
+
+    Args:
+        @mapper (callable function): a function to map sample.
+        @reader (callable iterator): the data reader to read from
+        @worker_num (int): process number to handle original sample
+        @buffer_size (int): max number of samples to buffer
+        @use_process (bool): whether use processes or threads as workers
+        @shared_memsize (int): size of shared memory used in IPC 
+        @shared_pagesize (int): page size of shared memory
+        @order (bool): whether need to keep the order of processing samples
+        @pre_feed (int): number of feeding samples before fetch the first result
+
+    Returns:
+        the decarated reader which yields mapped data from 'reader'
     """
     logger.debug('params in decorator.xmap_reader:[%s]' % (str(locals())))
-
-    assert buffer_size > 0, "invalid buffer_size[%d] in xmap_reader" % (
-        buffer_size)
-    if pre_feed is None:
-        pre_feed = 1 + buffer_size / 2
 
     if use_sharedmem:
         if shared_memsize is None:
@@ -469,13 +485,13 @@ def xmap_reader(reader, mapper=None, worker_num=16, \
         use_sharedmem = True
 
     if use_sharedmem:
-        assert use_process is True, "IPC of sharedmemory can only be used with 'use_process' enabled"
+        assert use_process is True, "sharedmemory mode can only be used with 'use_process' enabled"
 
     def _xreader():
         rd = XMappedReader(reader, mapper=mapper, worker_num=worker_num, \
                 buffer_size=buffer_size, use_process=use_process, \
                 shared_memsize=shared_memsize, shared_pagesize=shared_pagesize, \
-                flatmap=flatmap, pre_feed=pre_feed)
+                order=order, pre_feed=pre_feed)
 
         for i in rd():
             yield i
@@ -485,8 +501,8 @@ def xmap_reader(reader, mapper=None, worker_num=16, \
 
 class Xmap(object):
     def __init__(self, mapper, worker_num=16,\
-        buffer_size=1000, order=False, use_process=False,\
-        flatmap=False, **kwargs):
+        buffer_size=1000, order=False, \
+        use_process=False, **kwargs):
         self.args = {}
         for k, v in locals().items():
             if k not in ['self', 'kwargs']:

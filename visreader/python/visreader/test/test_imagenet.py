@@ -3,10 +3,8 @@ import os
 import sys
 import logging
 
-path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../')
-if path not in sys.path:
-    sys.path.insert(0, path)
-
+import set_env
+import visreader
 import visreader.example.imagenet_demo as imagenet
 
 
@@ -62,7 +60,7 @@ def main(argv):
                                                 (time.time() - start_ts)))
 
     train_reader = imagenet.train(
-        train_uri, pre_maps=pre_maps, lua_fname=lua_fname)
+        train_uri, pre_maps=pre_maps, lua_fname=lua_fname, pass_num=100)
     ct = 0
     prev_ct = 0
     ts = time.time()

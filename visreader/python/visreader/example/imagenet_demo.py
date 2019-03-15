@@ -24,7 +24,7 @@ import logging
 import copy
 from .. import operators as ops
 from .. import source
-from .. import pipeline
+from ..pipeline import Dataset
 
 g_settings = {
     'img_size': 224,
@@ -89,11 +89,8 @@ def make_reader(mode,
                 part_num=None,
                 cache=None,
                 pre_maps=None,
+                pass_num=1,
                 **kwargs):
-    infinite = False
-    if mode == 'train':
-        infinite = True
-
     if part_id is None:
         part_id = g_settings['part_id']
 
@@ -103,21 +100,20 @@ def make_reader(mode,
     if cache is None:
         cache = g_settings['cache']
 
-    sc = source.load(
+    ds = Dataset.load(
         uri=uri,
         part_id=part_id,
         part_num=part_num,
         cache=cache,
-        infinite=infinite)
+        pass_num=pass_num)
 
-    p = pipeline.Pipeline()
     if 'shuffle_size' in kwargs:
         sf_sz = kwargs['shuffle_size']
     else:
         sf_sz = g_settings['shuffle_size']
 
     if mode == 'train' and sf_sz > 0:
-        p.shuffle(sf_sz)
+        ds.shuffle(sf_sz)
 
     maps = []
     if pre_maps is not None:
@@ -137,9 +133,10 @@ def make_reader(mode,
         ) if mode == 'train' else test_image_mapper()
 
     for m in maps:
-        p.map(m)
-    p.map_ops(img_ops, **args)
-    return p.transform(sc.reader())
+        ds.map(m)
+
+    ds.map_ops(img_ops, **args)
+    return ds.reader()
 
 
 def train(uri, **kwargs):
