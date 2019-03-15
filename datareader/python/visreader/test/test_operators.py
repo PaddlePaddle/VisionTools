@@ -8,13 +8,10 @@ import logging
 import PIL
 import numpy as np
 
-logging.basicConfig(level=logging.DEBUG)
-
-path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../')
-if path not in sys.path:
-    sys.path.insert(0, path)
-
+import set_env
 import visreader.operators as ops
+
+logging.basicConfig(level=logging.INFO)
 
 
 def get_ops(img_size=224, op_class='pil', normalize=True):
