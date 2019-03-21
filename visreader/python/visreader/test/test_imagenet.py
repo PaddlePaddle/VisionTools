@@ -60,7 +60,7 @@ def main(argv):
                                                 (time.time() - start_ts)))
 
     train_reader = imagenet.train(
-        train_uri, pre_maps=pre_maps, lua_fname=lua_fname)
+        train_uri, pre_maps=pre_maps, lua_fname=lua_fname, pass_num=100)
     ct = 0
     prev_ct = 0
     ts = time.time()

@@ -89,11 +89,8 @@ def make_reader(mode,
                 part_num=None,
                 cache=None,
                 pre_maps=None,
+                pass_num=1,
                 **kwargs):
-    infinite = False
-    if mode == 'train':
-        infinite = True
-
     if part_id is None:
         part_id = g_settings['part_id']
 
@@ -108,7 +105,7 @@ def make_reader(mode,
         part_id=part_id,
         part_num=part_num,
         cache=cache,
-        infinite=infinite)
+        pass_num=pass_num)
 
     if 'shuffle_size' in kwargs:
         sf_sz = kwargs['shuffle_size']
@@ -137,6 +134,7 @@ def make_reader(mode,
 
     for m in maps:
         ds.map(m)
+
     ds.map_ops(img_ops, **args)
     return ds.reader()
 
