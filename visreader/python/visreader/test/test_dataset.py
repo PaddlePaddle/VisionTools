@@ -11,7 +11,7 @@ from visreader.pipeline import Dataset
 logging.basicConfig(level=logging.INFO)
 
 
-class TesDataset(unittest.TestCase):
+class TestDataset(unittest.TestCase):
     """Test cases for visreader.pipeline.Dataset
     """
 

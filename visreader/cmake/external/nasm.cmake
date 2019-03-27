@@ -19,8 +19,7 @@ SET(NASM_INSTALL_DIR ${THIRD_PARTY_PATH}/nasm)
 
 SET(NASM_BIN "${NASM_INSTALL_DIR}/bin/nasm" CACHE FILEPATH "nasm binary." FORCE)
 SET(NASM_PKG "nasm-2.10.07.tar.bz2")
-#SET(NASM_URL "https://www.nasm.us/pub/nasm/releasebuilds/2.10.07/${NASM_PKG}")
-SET(NASM_URL "http://10.88.151.33:8070/${NASM_PKG}")
+SET(NASM_URL "https://www.nasm.us/pub/nasm/releasebuilds/2.10.07/${NASM_PKG}")
 
 ExternalProject_Add(
     extern_nasm
