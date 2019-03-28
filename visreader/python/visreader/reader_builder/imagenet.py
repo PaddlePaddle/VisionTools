@@ -15,7 +15,7 @@
 """
 """
 # function
-#    build pipelines of data processing for model training and validation tasks
+#    build pipelines of data processing on imagenet for model training and validation
 #
 """
 import copy
@@ -34,7 +34,7 @@ default_settings = {
     'image_op_class': 'pil', #default to using PIL
     'normalize': True, #whether substract mean and divide std of image
     'worker_args': { #config for concurrent processing
-        'mode': WORKER_MODE_TYPES[0],
+        'worker_mode': WORKER_MODE_TYPES[0],
         'worker_num': 16,
         'buffer_size': 3000,
         'use_sharedmem': False
@@ -43,14 +43,18 @@ default_settings = {
 
 
 def train(settings=None):
-    """ build a pipeline of image data preprocessing
-        for training task
+    """ build a pipeline of imagenet data processing
+        for model training
     """
     #prepare trainning default settings
     df_sets = copy.deepcopy(default_settings)
     df_sets['shuffle_size'] = 10000
     if settings is not None:
-        df_sets.update(settings)
+        for k, v in settings.items():
+            if v != 'worker_args':
+                df_sets[k] = v
+            else:
+                df_sets[k].update(v)
 
     logger.debug('build pipeline of imagenet.train with settings[%s]' %
                  (str(df_sets)))
@@ -74,7 +78,7 @@ def train(settings=None):
         if df_sets['normalize']:
             img_ops += [ops.NormalizeImage()]
     else:
-        if worker_args['mode'] != 'native_thread':
+        if worker_args['worker_mode'] != 'native_thread':
             logger.warn(
                 'lua code can only be running in mode[native_thread], so switch to that'
             )
@@ -82,24 +86,21 @@ def train(settings=None):
             ops.LuaProcessImage(
                 lua_fname=df_sets['lua_fname'], tochw=True)
         ]
-        worker_args['mode'] = 'native_thread'
+        worker_args['worker_mode'] = 'native_thread'
 
-    if worker_args['mode'] == 'native_thread':
-        worker_args['cpp_xmap'] = True
+    if worker_args['worker_mode'] == 'native_thread':
         worker_args['use_process'] = False
         worker_args['use_sharedmem'] = False
-    elif worker_args['mode'] == 'python_thread':
-        worker_args['cpp_xmap'] = False
+    elif worker_args['worker_mode'] == 'python_thread':
         worker_args['use_process'] = False
         worker_args['use_sharedmem'] = False
-    elif worker_args['mode'] == 'python_process':
-        worker_args['cpp_xmap'] = True
+    elif worker_args['worker_mode'] == 'python_process':
         worker_args['use_process'] = True
+        worker_args['use_sharedmem'] = True
     else:
         raise ValueError('not recognized mode[%s] for worker_args' %
-                         (worker_args['mode']))
+                         (worker_args['worker_mode']))
 
-    del worker_args['mode']
     pl.map_ops(img_ops, **worker_args)
     return pl
 
@@ -111,7 +112,11 @@ def val(settings=None):
     #prepare validation default settings
     df_sets = copy.deepcopy(default_settings)
     if settings is not None:
-        df_sets.update(settings)
+        for k, v in settings.items():
+            if v != 'worker_args':
+                df_sets[k] = v
+            else:
+                df_sets[k].update(v)
 
     logger.debug('build pipeline of imagenet.val with settings[%s]' %
                  (str(df_sets)))
@@ -130,11 +135,15 @@ def val(settings=None):
         if df_sets['normalize']:
             img_ops += [ops.NormalizeImage()]
     else:
+        if worker_args['worker_mode'] != 'native_thread':
+            logger.warn(
+                'lua code can only be running in mode[native_thread], so switch to that'
+            )
+
         img_ops = [
             ops.LuaProcessImage(
                 lua_fname=df_sets['lua_fname'], tochw=True)
         ]
-        worker_args['cpp_xmap'] = True
         worker_args['use_process'] = False
         worker_args['use_sharedmem'] = False
 

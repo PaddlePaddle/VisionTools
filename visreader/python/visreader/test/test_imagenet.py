@@ -32,7 +32,7 @@ def main(argv):
     args = {}
     lua_fname = None
 
-    args['mode'] = argv['mode']
+    args['worker_mode'] = argv['mode']
     if not argv['use_lua']:
         args['use_sharedmem'] = argv['use_sharedmem']
     else:
