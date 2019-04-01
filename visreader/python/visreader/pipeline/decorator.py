@@ -359,9 +359,9 @@ class XMappedReader(object):
             end = XmapEndSignal(errmsg='ok', errno=0)
             return end
         except Exception as e:
+            stack_info = traceback.format_exc()
             logger.warn('failed to feed sample with stack info[%s]' %
                         (stack_info))
-            stack_info = traceback.format_exc()
             end = XmapEndSignal(stack_info, -1)
             return end
 

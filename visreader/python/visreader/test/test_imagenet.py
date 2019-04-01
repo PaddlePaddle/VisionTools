@@ -5,7 +5,11 @@ import logging
 
 import set_env
 import visreader
-import visreader.example.imagenet_demo as imagenet
+from visreader.reader_builder import ReaderBuilder
+from visreader.reader_builder import ReaderSetting
+visreader.set_loglevel(logging.INFO)
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_kv(r):
@@ -27,27 +31,34 @@ def main(argv):
 
     args = {}
     lua_fname = None
-    if argv['method'] == 'python':
-        args['cpp_xmap'] = False
-        args['use_process'] = argv['use_process']
+
+    args['worker_mode'] = argv['mode']
+    if not argv['use_lua']:
         args['use_sharedmem'] = argv['use_sharedmem']
     else:
-        args['cpp_xmap'] = True
-        args['use_process'] = False
-        if argv['method'] == 'lua':
-            lua_fname = argv['lua_fname']
+        lua_fname = argv['lua_fname']
 
     args['worker_num'] = argv['worker_num']
-    imagenet.g_settings['worker_args'] = args
-    pre_maps = [_parse_kv]
-    val_reader = imagenet.val(val_uri, pre_maps=pre_maps, lua_fname=lua_fname)
+    settings = {
+        'sample_parser': _parse_kv,
+        'lua_fname': lua_fname,
+        'worker_args': args
+    }
+    train_setting = ReaderSetting(
+        train_uri, sc_setting={'pass_num': 100}, pl_setting=settings)
+
+    val_setting = ReaderSetting(
+        val_uri, sc_setting={'pass_num': 1}, pl_setting=settings)
+    settings = {'train': train_setting, 'val': val_setting}
+
+    rd_builder = ReaderBuilder(settings=settings, pl_name='imagenet')
+    val_reader = rd_builder.val()
 
     ct = 0
     prev_ct = 0
     start_ts = time.time()
     for img, label in val_reader():
         assert img.shape == (3, 224, 224)
-
         cost = 1000 * (time.time() - start_ts)
         if cost >= 1000:
             start_ts = time.time()
@@ -59,8 +70,7 @@ def main(argv):
     print('total got %d val samples in %dms' % (ct, 1000 *
                                                 (time.time() - start_ts)))
 
-    train_reader = imagenet.train(
-        train_uri, pre_maps=pre_maps, lua_fname=lua_fname, pass_num=100)
+    train_reader = rd_builder.train()
     ct = 0
     prev_ct = 0
     ts = time.time()
@@ -88,10 +98,10 @@ def parse_args():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-method',
-        choices=['python', 'cpp', 'lua'],
-        help="which type of method to process images",
-        default='python')
+        '-mode',
+        choices=['native_thread', 'python_thread', 'python_process'],
+        help="which type of mode to process images",
+        default='python_thread')
 
     work_dir = os.path.dirname(os.path.realpath(__file__))
     train_uri = os.path.join(work_dir, '../../../tests/data/seqfile')
@@ -113,10 +123,10 @@ def parse_args():
         help='workers to process the images, default to 16')
 
     parser.add_argument(
-        '-use_process',
+        '-use_lua',
         default=False,
         action='store_true',
-        help='whether to use process or thread as workers, default to False')
+        help='whether to use lua operators, default to False')
     parser.add_argument(
         '-use_sharedmem',
         default=False,
@@ -129,5 +139,5 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    print args
+    logger.debug('run with argvs[%s]' % (args))
     exit(main(args))

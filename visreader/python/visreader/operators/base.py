@@ -149,7 +149,8 @@ def make_cpp_plan(ops, planner):
     return post_mapper
 
 
-def build(ops, worker_num=16, buffer_size=1000, cpp_xmap=False, \
+def build(ops, worker_num=16, buffer_size=1000, \
+        worker_mode='python_thread', \
         use_sharedmem=False, **kwargs):
     """ build a concurrently processing reader decorator which accept 
         a reader as input and return the processed reader as output
@@ -157,14 +158,16 @@ def build(ops, worker_num=16, buffer_size=1000, cpp_xmap=False, \
     Args:
         @ops (list): list of operator instance
         @worker_num (int): num of workers to process in the decorator
-        @cpp_xmap (bool): whether use decorator implemented in c++
+        @worker_mode (str): concurrency mode, eg: python_thread, python_process or native_thread
         @use_sharedmem (bool): whether to use shared memory for IPC
 
     Returns:
         decorator of reader
     """
-    if cpp_xmap:
-        assert not use_sharedmem, 'not supported "use_sharedmem" in cpp_xmap'
+    logger.debug('build concurrent mapper in mode[%s]' % (worker_mode))
+    if worker_mode == 'native_thread':
+        if use_sharedmem:
+            logger.warn('not supported use_sharedmem in native_thread mode')
         from ..transformer.pytransformer import Builder
         from ..transformer.pytransformer import CppXmap
         planner = Builder()

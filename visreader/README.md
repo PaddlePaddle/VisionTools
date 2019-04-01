@@ -30,9 +30,9 @@ Usually this pipeline includes data operations like `load/parse/decode/resize/cr
     - `python tools/jpeg2seqfile.py sample.list seqfile.bin` #transform jpeg files to seqfile
 
   * performance test
-    - `python python/visreader/test/test_imagenet.py -method=python` #process images in python
-    - `python python/visreader/test/test_imagenet.py -method=cpp` #process images in cpp
-    - `python python/visreader/test/test_imagenet.py -method=lua` #process images in lua
+    - `python python/visreader/test/test_imagenet.py -mode=native_thread` #process images with C thread
+    - `python python/visreader/test/test_imagenet.py -mode=python_thread` #process images with python thread
+    - `python python/visreader/test/test_imagenet.py -mode=python_process` #process images with python process
 
  * more test case can be found in `python/visreader/test`
 
