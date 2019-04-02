@@ -47,13 +47,14 @@ class SharedBuffer(object):
             every instance of this should be freed explicitely by calling 'self.free'
     """
 
-    def __init__(self, owner, capacity, pos, size=0):
+    def __init__(self, owner, capacity, pos, size=0, alloc_status=''):
         """ init
         """
         self._owner = owner
         self._cap = capacity  # capacity in bytes
         self._pos = pos  # page position
         self._size = size  # used bytes
+        self._alloc_status = alloc_status
         assert self._pos >= 0 and self._cap > 0, \
             "invalid params[%d:%d] to construct SharedBuffer" \
             % (self._pos, self._cap)
@@ -127,8 +128,10 @@ class SharedBuffer(object):
     def __str__(self):
         """ human readable format
         """
-        return "SharedBuffer(owner:%s, pos:%d, size:%d, capacity:%d, pid:%d)" \
-            % (str(self._owner), self._pos, self._size, self._cap, os.getpid())
+        return "SharedBuffer(owner:%s, pos:%d, size:%d, "\
+            "capacity:%d, alloc_status:[%s], pid:%d)" \
+            % (str(self._owner), self._pos, self._size, \
+            self._cap, self._alloc_status, os.getpid())
 
     def free(self):
         """ free this buffer to it's owner
@@ -145,27 +148,31 @@ class SharedBuffer(object):
 
 
 class PageAllocator(object):
-    """ a allocator for pages of memory
+    """ allocator used to malloc and free shared memory which
+        is split into pages
     """
-    s_allocator_header = 16
+    s_header_magic = 1234321
+    s_allocator_header = 12
 
-    def __init__(self, base, page_num, page_size):
+    def __init__(self, base, total_pages, page_size):
         """ init
         """
         self._base = base
-        self._page_num = page_num
+        self._total_pages = total_pages
         self._page_size = page_size
 
-        header_pages = int(math.ceil(float(page_num + \
+        header_pages = int(math.ceil(float(total_pages + \
             self.s_allocator_header) / page_size))
         self._header_pages = header_pages
-        self._header_memsize = self._header_pages * page_size
-        self._free_pages = page_num - header_pages
+        self._free_pages = total_pages - header_pages
+        self._header_size = self._header_pages * page_size
         self._reset()
 
     def _reset(self):
-        header_info = struct.pack('IIII', self._header_pages, \
-            self._page_num, self._header_pages, self._header_pages)
+        alloc_page_pos = self._header_pages
+        used_pages = self._header_pages
+        header_info = struct.pack('III', \
+            self.s_header_magic, alloc_page_pos, used_pages)
         assert len(header_info) == self.s_allocator_header, \
             'invalid size of header_info'
 
@@ -176,7 +183,11 @@ class PageAllocator(object):
     def header(self):
         """ get header info of this allocator
         """
-        return struct.unpack('IIII', self._base[0:self.s_allocator_header])
+        magic, pos, used = struct.unpack('III',
+                                         self._base[0:self.s_allocator_header])
+        assert magic == self.s_header_magic, \
+            'invalid header magic[%d] in shared memory' % (magic)
+        return self._header_pages, self._total_pages, pos, used
 
     def empty(self):
         """ are all allocatable pages available
@@ -199,25 +210,23 @@ class PageAllocator(object):
     def set_alloc_info(self, alloc_pos, used_pages):
         """ set allocating position to new value
         """
-        self._base[8:16] = struct.pack('II', alloc_pos, used_pages)
+        self._base[4:12] = struct.pack('II', alloc_pos, used_pages)
 
     def set_page_status(self, start, page_num, status):
         """ set pages from 'start' to 'end' with new same status 'status'
         """
-        #logger.debug('set_page_status with start:%d, page_num:%d, status:%s' \
-        #    % (start, page_num, status))
         assert status in ['0', '1'], 'invalid status[%s] for page status '\
             'in allocator[%s]' % (status, str(self))
         start += self.s_allocator_header
         end = start + page_num
-        assert start >= 0 and end <= self._header_memsize, 'invalid end[%d] of pages '\
+        assert start >= 0 and end <= self._header_size, 'invalid end[%d] of pages '\
             'in allocator[%s]' % (end, str(self))
         self._base[start:end] = status * page_num
 
     def get_page_status(self, start, page_num):
         start += self.s_allocator_header
         end = start + page_num
-        assert start >= 0 and end <= self._header_memsize, 'invalid end[%d] of pages '\
+        assert start >= 0 and end <= self._header_size, 'invalid end[%d] of pages '\
             'in allocator[%s]' % (end, str(self))
         return self._base[start:end]
 
@@ -230,7 +239,7 @@ class PageAllocator(object):
 
         page_status = self.get_page_status(pos, page_num)
         if page_status != '0' * page_num:
-            free_pages = self._page_num - used
+            free_pages = self._total_pages - used
             if free_pages == 0:
                 err_msg = 'all memory pages have been used:%s' % (str(self))
             else:
@@ -251,9 +260,6 @@ class PageAllocator(object):
     def free_page(self, start, page_num):
         """ free 'page_num' pages start from 'start'
         """
-        #logger.debug('free_page with info[start:%s, page_num:%d]' \
-        #    % (start, page_num))
-
         page_status = self.get_page_status(start, page_num)
         assert page_status == '1' * page_num, \
             'invalid status[%s] when free [%d, %d]' \
@@ -304,7 +310,7 @@ class SharedMemoryMgr(object):
         assert self._cap % self._page_size == 0, \
             "capacity[%d] and pagesize[%d] are not consistent" \
             % (self._cap, self._page_size)
-        self._page_num = int(self._cap / self._page_size)
+        self._total_pages = int(self._cap / self._page_size)
 
         self._pid = os.getpid()
         SharedMemoryMgr.s_mgr_num += 1
@@ -318,8 +324,8 @@ class SharedMemoryMgr(object):
         self._base = ctypes.addressof(self._shared_mem)
         self._locker.acquire()
         try:
-            self._allocator = PageAllocator(self._shared_mem, self._page_num,
-                                            self._page_size)
+            self._allocator = PageAllocator(self._shared_mem,
+                                            self._total_pages, self._page_size)
         finally:
             self._locker.release()
 
@@ -342,6 +348,7 @@ class SharedMemoryMgr(object):
         self._locker.acquire()
         try:
             start = self._allocator.malloc_page(page_num)
+            alloc_status = str(self._allocator)
         finally:
             self._locker.release()
 
@@ -349,7 +356,7 @@ class SharedMemoryMgr(object):
             raise SharedMemoryError('failed to malloc %d bytes of memory' %
                                     (size))
 
-        return SharedBuffer(self._id, size, start)
+        return SharedBuffer(self._id, size, start, alloc_status=alloc_status)
 
     def free(self, shared_buf):
         """ free a SharedBuffer
@@ -382,7 +389,7 @@ class SharedMemoryMgr(object):
     def put_data(self, shared_buf, data):
         """  fill 'data' into 'shared_buf'
         """
-        assert shared_buf.capacity() >= len(data), 'too large data[%d] '\
+        assert len(data) <= shared_buf.capacity(), 'too large data[%d] '\
             'for this buffer[%s]' % (len(data), str(shared_buf))
         start = shared_buf._pos * self._page_size
         assert start >= 0 and start + len(data) < self._cap, "invalid start "\
