@@ -243,6 +243,11 @@ std::string mat2str(const cv::Mat &mat) {
   return result;
 }
 
+cv::Mat str2mat(const std::string &str) {
+  cv::Mat result(1, str.size(), CV_8U, (void *)str.c_str());
+  return result;
+}
+
 int tochw(const cv::Mat &mat, std::string *outstr) {
   if (mat.channels() == 1) {
     int size = mat.total() * mat.elemSize();

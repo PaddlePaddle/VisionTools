@@ -1,6 +1,6 @@
 import copy
+import traceback
 from ..source import source
-from . import imagenet
 
 
 class ReaderSetting(object):
@@ -82,13 +82,17 @@ class ReaderBuilder(object):
         rd_setting = self.settings[which]
         sc = self.get_source(which, rd_setting)
         pl_setting = rd_setting.pl_setting
-        if self.pl_name == 'imagenet':
-            if which == 'train':
-                pl = imagenet.train(pl_setting)
-            else:
-                pl = imagenet.val(pl_setting)
-        else:
-            raise ValueError('invalid name of pipeline[%s]' % (self.pl_name))
+        mod_name = '.'.join([self.pl_name] * 2)
+        try:
+            mod = __import__(mod_name, globals(), locals())
+            mod = getattr(mod, self.pl_name)
+            func = getattr(mod, which)
+            pl = func(pl_setting)
+        except Exception as e:
+            stack_info = traceback.format_exc()
+            raise ValueError('invalid name of pipeline[%s] with stack[%s]' %
+                             (self.pl_name, stack_info))
+
         return pl.transform(sc.reader())
 
     def train(self):
