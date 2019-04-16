@@ -30,6 +30,7 @@ KAGUYA_BINDINGS(luac_basic) {
   kaguya::function("imencode", encodeImage);
   kaguya::function("imdecode", decodeImage);
   kaguya::function("mat2str", mat2str);
+  kaguya::function("str2mat", str2mat);
 }
 
 static int initLuaEnv(lua_State *lua_s,

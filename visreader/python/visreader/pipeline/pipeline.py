@@ -90,8 +90,9 @@ def filter_reader(func, reader):
     """
 
     def _reader():
-        for r in filter(func, reader()):
-            yield r
+        for r in reader():
+            if func(r):
+                yield r
 
     return _reader
 

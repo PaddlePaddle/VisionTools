@@ -27,7 +27,8 @@ Usually this pipeline includes data operations like `load/parse/decode/resize/cr
 ### How to use
 
   * prepare seqfile (default seqfile is stored in tests/data/seqfile)
-    - `python tools/jpeg2seqfile.py sample.list seqfile.bin` #transform jpeg files to seqfile
+    -  download from [onedrive](https://onedrive.live.com/?authkey=%21AJZJXHcZyLQAh8E&id=910128F56B9FFE8D%21106&cid=910128F56B9FFE8D)
+    - Or create it use tools `python tools/jpeg2seqfile.py sample.list seqfile.bin` #transform jpeg files to seqfile
 
   * performance test
     - `python python/visreader/test/test_imagenet.py -mode=native_thread` #process images with C thread
@@ -42,4 +43,3 @@ Usually this pipeline includes data operations like `load/parse/decode/resize/cr
   1. cmake error: *Could NOT find PythonLibs (missing: PYTHON_LIBRARIES PYTHON_INCLUDE_DIRS)*
      ```
      cmake -DPYTHON_LIBRARIES=/path/to/your/python/lib/libpython2.7.so ..
-     ```

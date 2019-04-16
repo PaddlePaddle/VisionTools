@@ -305,6 +305,9 @@ class XMappedReader(object):
             buffer_size=1000, use_process=False, \
             shared_memsize=None, shared_pagesize=None, \
             order=False, pre_feed=None):
+        logger.debug('create XMappedReader with shared_memsize[%s]' %
+                     (str(shared_memsize)))
+
         assert buffer_size > 0, "invalid buffer_size[%d] in XMappedReader" \
             % (buffer_size)
         if pre_feed is None:
@@ -477,15 +480,18 @@ def xmap_reader(reader, mapper=None, worker_num=16, \
     """
     logger.debug('params in decorator.xmap_reader:[%s]' % (str(locals())))
 
-    if use_sharedmem:
+    if use_sharedmem is False or shared_memsize is None:
+        use_sharedmem = False
+        shared_memsize = None
+        shared_pagesize = None
+    else:
+        use_sharedmem = True
+        assert use_process is True, 'sharedmemory mode can only be used '\
+            'with "use_process" enabled'
         if shared_memsize is None:
             shared_memsize = 1 * 1024 * 1024 * 1024
+        if shared_pagesize is None:
             shared_pagesize = 64 * 1024
-    elif shared_memsize is not None:
-        use_sharedmem = True
-
-    if use_sharedmem:
-        assert use_process is True, "sharedmemory mode can only be used with 'use_process' enabled"
 
     def _xreader():
         rd = XMappedReader(reader, mapper=mapper, worker_num=worker_num, \

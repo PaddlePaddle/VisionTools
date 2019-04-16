@@ -20,8 +20,8 @@
 """
 import copy
 import logging
-from .. import operators as ops
-from .. import pipeline
+from ... import operators as ops
+from ... import pipeline
 
 #mode type for concurrent processing of image data
 WORKER_MODE_TYPES = ['native_thread', 'python_thread', 'python_process']
