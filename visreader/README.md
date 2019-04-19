@@ -12,16 +12,17 @@ Usually this pipeline includes data operations like `load/parse/decode/resize/cr
   * support lua embedding for image processing
 
 ---
-### How to install
-
+### How to build
   * prepare requirements
     - install cython: `pip install cython`
 
   * build wheel(default to build with lua and turbojpeg)
-    `mkdir output && cd output && cmake ../ && make`
+    `mkdir build && cd build && cmake ../ && make`
 
   * install wheel
     `python install output/dist/visreader-0.0.1-cp27-cp27mu-linux_x86_64.whl`
+
+  * Or install it from [pypi](https://pypi.org/) without compiling `pip install visreader`
 
 ---
 ### How to use
