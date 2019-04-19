@@ -126,8 +126,11 @@ def make_transform_ext(name, pyxfile, ext_root):
         language='c++')
 
 
+with open(os.path.join(curfolder, 'requirements.txt')) as f:
+    setup_requires = f.read().splitlines()
+
 modname = 'visreader'
-version = '1.0.0'
+version = '1.0.1'
 
 #make cpp extension
 lib_modname = modname + '.transformer.libpytransform'
@@ -139,8 +142,11 @@ pysource = 'python'
 setup(
     name=modname,
     version=version,
-    url='https://github.com/PaddlePaddle/VisionTools.git',
-    description="a package for data loading and preprocessing in training model",
+    author='wanglong',
+    author_email='wanglong03@baidu.com',
+    install_requires=setup_requires,
+    url='https://github.com/PaddlePaddle/VisionTools/tree/master/visreader',
+    description="a python tool used in data processing for vision model training",
     packages=find_packages(where=pysource),
     package_dir={'': pysource},
     cmdclass={'build_ext': build_ext},
