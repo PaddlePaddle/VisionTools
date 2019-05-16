@@ -402,12 +402,11 @@ class XMappedReader(object):
             end = self._feed_sample(iter, inq, feed_ctx)
 
         # no more task or failure happened, so notify all workers to exit
+        self._notify_exit(end)
         if end.get_errno() != 0:
-            raise XmapProcessError('faield to feed sample to other process'\
-                ' with error[errno:%d, errmsg:%s]' \
+            raise XmapProcessError('failed to process for reason[errno:%d, errmsg:%s]' \
                 % (end.get_errno(), end.get_errmsg()))
 
-        self._notify_exit(end)
         while self._finished_workers < self._worker_num:
             result = outq.get()
             if isinstance(result, XmapEndSignal):
@@ -480,18 +479,19 @@ def xmap_reader(reader, mapper=None, worker_num=16, \
     """
     logger.debug('params in decorator.xmap_reader:[%s]' % (str(locals())))
 
-    if use_sharedmem is False or shared_memsize is None:
-        use_sharedmem = False
+    if not use_sharedmem:
         shared_memsize = None
         shared_pagesize = None
     else:
-        use_sharedmem = True
         assert use_process is True, 'sharedmemory mode can only be used '\
             'with "use_process" enabled'
         if shared_memsize is None:
             shared_memsize = 1 * 1024 * 1024 * 1024
         if shared_pagesize is None:
             shared_pagesize = 64 * 1024
+
+    logger.debug('modified params in decorator.xmap_reader:[%s]' %
+                 (str(locals())))
 
     def _xreader():
         rd = XMappedReader(reader, mapper=mapper, worker_num=worker_num, \

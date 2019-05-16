@@ -15,6 +15,7 @@ import set_env
 import visreader
 from visreader.shared_queue import SharedMemoryMgr
 from visreader.shared_queue import SharedQueue
+from visreader.shared_queue import SharedMemoryError
 
 logging.basicConfig(level=logging.INFO)
 SharedMemoryMgr.s_log_statis = True
@@ -41,12 +42,32 @@ class TestSharedQueue(unittest.TestCase):
         pass
 
     def test_sharedmem(self):
-        mgr = SharedMemoryMgr(capacity=1024 * 1024, pagesize=1 * 1024)
-        buf = mgr.malloc(10)
-        buf.put('hello')
+        pagenum = 4
+        pagesize = 32
+        mgr = SharedMemoryMgr(capacity=pagenum * pagesize, pagesize=pagesize)
 
-        self.assertEqual(buf.get(), 'hello')
-        buf.free()
+        bufs = []
+        for i in range(pagenum):
+            if i >= pagenum - 1:
+                with self.assertRaises(SharedMemoryError):
+                    buf = mgr.malloc(10)
+                break
+            else:
+                buf = mgr.malloc(10)
+
+            buf.put('hello_%d' % (i))
+            bufs.append(buf)
+
+        for i, bf in enumerate(bufs):
+            self.assertEqual(bf.get(), 'hello_%d' % (i))
+
+        bufs[1].free()
+        bufs[1] = mgr.malloc(10)
+        bufs[1].put('hello_1')
+
+        for i, bf in enumerate(bufs):
+            self.assertEqual(bf.get(), 'hello_%d' % (i))
+            bf.free()
 
     def test_sharedqueue(self):
         sq = SharedQueue(maxsize=100)

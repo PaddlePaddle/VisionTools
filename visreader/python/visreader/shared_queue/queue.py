@@ -74,10 +74,6 @@ class SharedQueue(Queue):
             raise e
 
         data = buff.get()
-        if data is None:
-            raise SharedQueueError('failed to extract data from shared buffer[%s]'\
-                % (str(buff)))
-
         buff.free()
         return cPickle.loads(data)
 

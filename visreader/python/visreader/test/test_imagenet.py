@@ -130,7 +130,7 @@ def parse_args():
         help='whether to use lua operators, default to False')
     parser.add_argument(
         '-use_sharedmem',
-        default=false,
+        default='false',
         type=str,
         help='whether to use shared memory as IPC when using process as workers, default to false'
     )

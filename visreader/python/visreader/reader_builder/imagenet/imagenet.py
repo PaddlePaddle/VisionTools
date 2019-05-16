@@ -96,7 +96,6 @@ def train(settings=None):
         worker_args['use_sharedmem'] = False
     elif worker_args['worker_mode'] == 'python_process':
         worker_args['use_process'] = True
-        worker_args['use_sharedmem'] = True
     else:
         raise ValueError('not recognized mode[%s] for worker_args' %
                          (worker_args['worker_mode']))
@@ -146,6 +145,18 @@ def val(settings=None):
         ]
         worker_args['use_process'] = False
         worker_args['use_sharedmem'] = False
+
+    if worker_args['worker_mode'] == 'native_thread':
+        worker_args['use_process'] = False
+        worker_args['use_sharedmem'] = False
+    elif worker_args['worker_mode'] == 'python_thread':
+        worker_args['use_process'] = False
+        worker_args['use_sharedmem'] = False
+    elif worker_args['worker_mode'] == 'python_process':
+        worker_args['use_process'] = True
+    else:
+        raise ValueError('not recognized mode[%s] for worker_args' %
+                         (worker_args['worker_mode']))
 
     pl.map_ops(img_ops, **worker_args)
     return pl
