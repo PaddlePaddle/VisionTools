@@ -19,7 +19,9 @@
 import os
 import math
 import struct
-import ctypes
+import json
+import uuid
+import random
 import weakref
 import logging
 from multiprocessing import Lock
@@ -151,12 +153,12 @@ class PageAllocator(object):
     """ allocator used to malloc and free shared memory which
         is split into pages
     """
-    s_header_magic = 1234321
     s_allocator_header = 12
 
     def __init__(self, base, total_pages, page_size):
         """ init
         """
+        self._magic_num = 1234321000 + random.randint(100, 999)
         self._base = base
         self._total_pages = total_pages
         self._page_size = page_size
@@ -168,11 +170,29 @@ class PageAllocator(object):
         self._header_size = self._header_pages * page_size
         self._reset()
 
+    def _dump_alloc_info(self):
+        """ dump allocation info about this allocator
+        """
+        hpages, tpages, pos, used = self.header()
+
+        start = self.s_allocator_header
+        end = start + self._page_size * hpages
+        alloc_flags = self._base[start:end]
+        info = {
+            'magic_num': self._magic_num,
+            'header_pages': hpages,
+            'total_pages': tpages,
+            'pos': pos,
+            'used': used
+        }
+        info['alloc_flags'] = alloc_flags
+        logger.warn('dumpped alloc info:{%s}' % (json.dumps(info)))
+
     def _reset(self):
         alloc_page_pos = self._header_pages
         used_pages = self._header_pages
         header_info = struct.pack('III', \
-            self.s_header_magic, alloc_page_pos, used_pages)
+            self._magic_num, alloc_page_pos, used_pages)
         assert len(header_info) == self.s_allocator_header, \
             'invalid size of header_info'
 
@@ -185,7 +205,7 @@ class PageAllocator(object):
         """
         magic, pos, used = struct.unpack('III',
                                          self._base[0:self.s_allocator_header])
-        assert magic == self.s_header_magic, \
+        assert magic == self._magic_num, \
             'invalid header magic[%d] in shared memory' % (magic)
         return self._header_pages, self._total_pages, pos, used
 
@@ -203,8 +223,8 @@ class PageAllocator(object):
 
     def __str__(self):
         header_pages, pages, pos, used = self.header()
-        desc = '{page_info[total:%d,used:%d,header:%d,alloc_pos:%d,pagesize:%d]}' \
-            % (pages, used, header_pages, pos, self._page_size)
+        desc = '{page_info[magic:%d,total:%d,used:%d,header:%d,alloc_pos:%d,pagesize:%d]}' \
+            % (self._magic_num, pages, used, header_pages, pos, self._page_size)
         return 'PageAllocator:%s' % (desc)
 
     def set_alloc_info(self, alloc_pos, used_pages):
@@ -223,12 +243,15 @@ class PageAllocator(object):
             'in allocator[%s]' % (end, str(self))
         self._base[start:end] = status * page_num
 
-    def get_page_status(self, start, page_num):
+    def get_page_status(self, start, page_num, ret_flag=False):
         start += self.s_allocator_header
         end = start + page_num
         assert start >= 0 and end <= self._header_size, 'invalid end[%d] of pages '\
             'in allocator[%s]' % (end, str(self))
         status = self._base[start:end]
+        if ret_flag:
+            return status
+
         zero_num = status.count('0')
         if zero_num == 0:
             return (page_num, 1)
@@ -242,17 +265,46 @@ class PageAllocator(object):
             pos = self._header_pages
             end = pos + page_num
 
-        page_status = self.get_page_status(pos, page_num)
+        start_pos = pos
+        flags = ''
+        while True:
+            # maybe flags already has some '0' pages,
+            # so just check 'page_num - len(flags)' pages
+            flags += self.get_page_status(
+                pos, page_num - len(flags), ret_flag=True)
+
+            if flags.count('0') == page_num:
+                logger.debug('found available pages at pos[%d]' % (pos))
+                break
+
+            # not found enough pages, so shift to next few pages
+            free_pos = flags.rfind('1') + 1
+            flags = flags[free_pos:]
+
+            pos += free_pos
+            end = pos + page_num
+            if end > pages:
+                pos = self._header_pages
+                end = pos + page_num
+                flags = ''
+
+            # not found available pages after scan all pages
+            if pos <= start_pos and end >= start_pos:
+                logger.debug('not found available pages after scan all pages')
+                break
+
+        page_status = (flags.count('0'), 0)
         if page_status != (page_num, 0):
             free_pages = self._total_pages - used
             if free_pages == 0:
-                err_msg = 'all memory pages have been used:%s' % (str(self))
+                err_msg = 'all pages have been used:%s' % (str(self))
             else:
                 err_msg = 'not found available pages with page_status[%s] '\
                     'and %d free pages' % (str(page_status), free_pages)
             err_msg = 'failed to malloc %d pages at pos[%d] for reason[%s] and allocator status[%s]' \
                 % (page_num, pos, err_msg, str(self))
             logger.warn(err_msg)
+            self._dump_alloc_info()
             raise SharedMemoryError(err_msg)
 
         self.set_page_status(pos, page_num, '1')
@@ -327,7 +379,6 @@ class SharedMemoryMgr(object):
 
     def _setup(self):
         self._shared_mem = RawArray('c', self._cap)
-        self._base = ctypes.addressof(self._shared_mem)
         self._locker.acquire()
         try:
             self._allocator = PageAllocator(self._shared_mem,
@@ -398,9 +449,10 @@ class SharedMemoryMgr(object):
         assert len(data) <= shared_buf.capacity(), 'too large data[%d] '\
             'for this buffer[%s]' % (len(data), str(shared_buf))
         start = shared_buf._pos * self._page_size
-        assert start >= 0 and start + len(data) < self._cap, "invalid start "\
+        end = start + len(data)
+        assert start >= 0 and end <= self._cap, "invalid start "\
             "position[%d] when put data to buff:%s" % (start, str(shared_buf))
-        ctypes.memmove(self._base + start, data, len(data))
+        self._shared_mem[start:end] = data
 
     def get_data(self, shared_buf, offset, size):
         """ extract 'data' from 'shared_buf' in range [offset, offset + size)
