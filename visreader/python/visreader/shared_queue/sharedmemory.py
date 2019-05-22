@@ -17,8 +17,10 @@
     note that all this structures are not thread-safe or process-safe
 """
 import os
+import time
 import math
 import struct
+import cPickle
 import json
 import uuid
 import random
@@ -40,6 +42,15 @@ class SharedBufferError(SharedMemoryError):
     """ SharedBufferError
     """
     pass
+
+
+class MemoryFullError(SharedMemoryError):
+    """ MemoryFullError
+    """
+
+    def __init__(self, errmsg=''):
+        super(MemoryFullError, self).__init__()
+        self.errmsg = errmsg
 
 
 class SharedBuffer(object):
@@ -170,9 +181,7 @@ class PageAllocator(object):
         self._header_size = self._header_pages * page_size
         self._reset()
 
-    def _dump_alloc_info(self):
-        """ dump allocation info about this allocator
-        """
+    def _dump_alloc_info(self, fname):
         hpages, tpages, pos, used = self.header()
 
         start = self.s_allocator_header
@@ -186,7 +195,10 @@ class PageAllocator(object):
             'used': used
         }
         info['alloc_flags'] = alloc_flags
-        logger.warn('dumpped alloc info:{%s}' % (json.dumps(info)))
+        fname = fname + '.' + str(uuid.uuid4())[:6]
+        with open(fname, 'wb') as f:
+            f.write(cPickle.dumps(info, -1))
+        logger.warn('dump alloc info to file[%s]' % (fname))
 
     def _reset(self):
         alloc_page_pos = self._header_pages
@@ -303,9 +315,7 @@ class PageAllocator(object):
                     'and %d free pages' % (str(page_status), free_pages)
             err_msg = 'failed to malloc %d pages at pos[%d] for reason[%s] and allocator status[%s]' \
                 % (page_num, pos, err_msg, str(self))
-            logger.warn(err_msg)
-            self._dump_alloc_info()
-            raise SharedMemoryError(err_msg)
+            raise MemoryFullError(err_msg)
 
         self.set_page_status(pos, page_num, '1')
         used += page_num
@@ -386,11 +396,12 @@ class SharedMemoryMgr(object):
         finally:
             self._locker.release()
 
-    def malloc(self, size):
+    def malloc(self, size, wait=True):
         """ malloc a new SharedBuffer
 
         Args:
             @size (int): buffer size to be malloc
+            @wait (bool): whether to wait when no enough memory
 
         Returns:
             SharedBuffer
@@ -402,16 +413,29 @@ class SharedMemoryMgr(object):
         size = page_num * self._page_size
 
         start = None
-        self._locker.acquire()
-        try:
-            start = self._allocator.malloc_page(page_num)
-            alloc_status = str(self._allocator)
-        finally:
-            self._locker.release()
+        ct = 0
+        errmsg = ''
+        while True:
+            self._locker.acquire()
+            try:
+                start = self._allocator.malloc_page(page_num)
+                alloc_status = str(self._allocator)
+            except MemoryFullError as e:
+                start = None
+                errmsg = e.errmsg
+                if not wait:
+                    raise e
+            finally:
+                self._locker.release()
 
-        if start is None:
-            raise SharedMemoryError('failed to malloc %d bytes of memory' %
-                                    (size))
+            if start is None:
+                time.sleep(0.1)
+                if ct % 100 == 0:
+                    logger.warn('not enough space for reason[%s]' % (errmsg))
+
+                ct += 1
+            else:
+                break
 
         return SharedBuffer(self._id, size, start, alloc_status=alloc_status)
 
