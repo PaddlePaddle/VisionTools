@@ -47,17 +47,19 @@ class SharedQueue(Queue):
         """ put an object to this queue
         """
         obj = cPickle.dumps(obj, -1)
-        buff = self._shared_mem.malloc(len(obj))
-        buff.put(obj)
-
+        buff = None
         try:
+            buff = self._shared_mem.malloc(len(obj))
+            buff.put(obj)
             super(SharedQueue, self).put(buff, **kwargs)
         except Exception as e:
             stack_info = traceback.format_exc()
             err_msg = 'failed to put a element to SharedQueue '\
                 'with stack info[%s]' % (stack_info)
             logger.warn(err_msg)
-            buff.free()
+
+            if buff is not None:
+                buff.free()
             raise e
 
     def get(self, **kwargs):
@@ -66,16 +68,17 @@ class SharedQueue(Queue):
         buff = None
         try:
             buff = super(SharedQueue, self).get(**kwargs)
+            data = buff.get()
+            return cPickle.loads(data)
         except Exception as e:
             stack_info = traceback.format_exc()
             err_msg = 'failed to get element from SharedQueue '\
                         'with stack info[%s]' % (stack_info)
             logger.warn(err_msg)
             raise e
-
-        data = buff.get()
-        buff.free()
-        return cPickle.loads(data)
+        finally:
+            if buff is not None:
+                buff.free()
 
     def release(self):
         self._shared_mem.release()

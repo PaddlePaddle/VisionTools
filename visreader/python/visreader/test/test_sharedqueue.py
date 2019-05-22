@@ -50,7 +50,7 @@ class TestSharedQueue(unittest.TestCase):
         for i in range(pagenum):
             if i >= pagenum - 1:
                 with self.assertRaises(SharedMemoryError):
-                    buf = mgr.malloc(10)
+                    buf = mgr.malloc(10, False)
                 break
             else:
                 buf = mgr.malloc(10)
@@ -73,6 +73,16 @@ class TestSharedQueue(unittest.TestCase):
         sq = SharedQueue(maxsize=100)
         sq.put('hello')
         self.assertEqual(sq.get(), 'hello')
+
+    def test_put_and_get(self):
+        sq = SharedQueue(maxsize=100, memsize=3 * 1024, pagesize=1024)
+        sq.put('hi_1')
+        sq.put('hi_2')
+        self.assertEqual(sq.get(), 'hi_1')
+
+        sq.put('hi_3')
+        self.assertEqual(sq.get(), 'hi_2')
+        self.assertEqual(sq.get(), 'hi_3')
 
     def test_performance(self):
         data_num = 10000
