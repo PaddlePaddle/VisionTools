@@ -1,5 +1,4 @@
-"""
-# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
+# Copyright (c) 2019 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import cPickle
 import logging
 import traceback
-from sharedmemory import SharedMemoryMgr
+from cStringIO import StringIO
+
 from multiprocessing.queues import Queue
+from multiprocessing.queues import SimpleQueue
+
+from .sharedmemory import SharedMemoryMgr
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +77,7 @@ class SharedQueue(Queue):
         try:
             buff = super(SharedQueue, self).get(**kwargs)
             data = buff.get()
-            return cPickle.loads(data)
+            return cPickle.load(StringIO(data))
         except Exception as e:
             stack_info = traceback.format_exc()
             err_msg = 'failed to get element from SharedQueue '\
@@ -79,7 +87,3 @@ class SharedQueue(Queue):
         finally:
             if buff is not None:
                 buff.free()
-
-    def release(self):
-        self._shared_mem.release()
-        self._shared_mem = None
