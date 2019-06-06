@@ -1,5 +1,4 @@
-"""
-# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved
+# Copyright (c) 2019 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +11,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-""" utils for memory management which is allocated on sharedmemory,
-    note that all this structures are not thread-safe or process-safe
-"""
+
+# utils for memory management which is allocated on sharedmemory,
+#    note that these structures may not be thread-safe
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import os
 import time
 import math
 import struct
-import cPickle
+import sys
+import six
+
+if six.PY3:
+    import pickle
+else:
+    import cPickle as pickle
+
 import json
 import uuid
 import random
+import numpy as np
 import weakref
 import logging
 from multiprocessing import Lock
@@ -53,6 +65,19 @@ class MemoryFullError(SharedMemoryError):
         self.errmsg = errmsg
 
 
+def memcopy(dst, src, offset=0, length=None):
+    """ copy data from 'src' to 'dst' in bytes
+    """
+    length = length if length is not None else len(src)
+    assert type(dst) == np.ndarray, 'invalid type for "dst" in memcopy'
+    if type(src) is not np.ndarray:
+        if type(src) is str and six.PY3:
+            src = src.encode()
+        src = np.frombuffer(src, dtype='uint8', count=len(src))
+
+    dst[:] = src[offset:offset + length]
+
+
 class SharedBuffer(object):
     """ Buffer allocated from SharedMemoryMgr, and it stores data on shared memory
 
@@ -61,12 +86,19 @@ class SharedBuffer(object):
     """
 
     def __init__(self, owner, capacity, pos, size=0, alloc_status=''):
-        """ init
+        """ Init
+
+            Args:
+                owner (str): manager to own this buffer
+                capacity (int): capacity in bytes for this buffer
+                pos (int): page position in shared memory
+                size (int): bytes already used
+                alloc_status (str): debug info about allocator when allocate this
         """
         self._owner = owner
-        self._cap = capacity  # capacity in bytes
-        self._pos = pos  # page position
-        self._size = size  # used bytes
+        self._cap = capacity
+        self._pos = pos
+        self._size = size
         self._alloc_status = alloc_status
         assert self._pos >= 0 and self._cap > 0, \
             "invalid params[%d:%d] to construct SharedBuffer" \
@@ -81,7 +113,7 @@ class SharedBuffer(object):
         """ put data to this buffer
 
         Args:
-            @data (str): data to be stored in this buffer
+            data (str): data to be stored in this buffer
 
         Returns:
             None
@@ -89,7 +121,8 @@ class SharedBuffer(object):
         Raises:
             SharedMemoryError when not enough space in this buffer
         """
-        assert type(data) == str, 'invalid type for SharedBuffer::put'
+        assert type(data) in [str, bytes], \
+            'invalid type[%s] for SharedBuffer::put' % (str(type(data)))
         if self._size > 0 and not override:
             raise SharedBufferError('already has already been setted before')
 
@@ -100,15 +133,16 @@ class SharedBuffer(object):
         self.owner().put_data(self, data)
         self._size = len(data)
 
-    def get(self, offset=0, size=None):
+    def get(self, offset=0, size=None, no_copy=True):
         """ get the data stored this buffer
 
         Args:
-            @offset (int): position for the start point to 'get'
-            @size (int): size to get
+            offset (int): position for the start point to 'get'
+            size (int): size to get
 
         Returns:
-            data (str): user's data passed in by 'put' if exist
+            data (np.ndarray('uint8')): user's data in numpy 
+                which is passed in by 'put'
             None: if no data stored in
         """
         offset = offset if offset >= 0 else self._size + offset
@@ -118,7 +152,7 @@ class SharedBuffer(object):
         size = self._size if size is None else size
         assert offset + size <= self._cap, 'invalid offset[%d] '\
             'or size[%d] for capacity[%d]' % (offset, size, self._cap)
-        return self.owner().get_data(self, offset, size)
+        return self.owner().get_data(self, offset, size, no_copy=no_copy)
 
     def size(self):
         """ bytes of used memory
@@ -174,8 +208,9 @@ class PageAllocator(object):
         self._total_pages = total_pages
         self._page_size = page_size
 
-        header_pages = int(math.ceil(float(total_pages + \
-            self.s_allocator_header) / page_size))
+        header_pages = int(
+            math.ceil((total_pages + self.s_allocator_header) / page_size))
+
         self._header_pages = header_pages
         self._free_pages = total_pages - header_pages
         self._header_size = self._header_pages * page_size
@@ -186,7 +221,7 @@ class PageAllocator(object):
 
         start = self.s_allocator_header
         end = start + self._page_size * hpages
-        alloc_flags = self._base[start:end]
+        alloc_flags = self._base[start:end].tostring()
         info = {
             'magic_num': self._magic_num,
             'header_pages': hpages,
@@ -197,26 +232,27 @@ class PageAllocator(object):
         info['alloc_flags'] = alloc_flags
         fname = fname + '.' + str(uuid.uuid4())[:6]
         with open(fname, 'wb') as f:
-            f.write(cPickle.dumps(info, -1))
+            f.write(pickle.dumps(info, -1))
         logger.warn('dump alloc info to file[%s]' % (fname))
 
     def _reset(self):
         alloc_page_pos = self._header_pages
         used_pages = self._header_pages
-        header_info = struct.pack('III', \
-            self._magic_num, alloc_page_pos, used_pages)
+        header_info = struct.pack(
+            str('III'), self._magic_num, alloc_page_pos, used_pages)
         assert len(header_info) == self.s_allocator_header, \
             'invalid size of header_info'
 
-        self._base[0:self.s_allocator_header] = header_info
+        memcopy(self._base[0:self.s_allocator_header], header_info)
         self.set_page_status(0, self._header_pages, '1')
         self.set_page_status(self._header_pages, self._free_pages, '0')
 
     def header(self):
         """ get header info of this allocator
         """
-        magic, pos, used = struct.unpack('III',
-                                         self._base[0:self.s_allocator_header])
+        header_str = self._base[0:self.s_allocator_header].tostring()
+        magic, pos, used = struct.unpack(str('III'), header_str)
+
         assert magic == self._magic_num, \
             'invalid header magic[%d] in shared memory' % (magic)
         return self._header_pages, self._total_pages, pos, used
@@ -242,7 +278,8 @@ class PageAllocator(object):
     def set_alloc_info(self, alloc_pos, used_pages):
         """ set allocating position to new value
         """
-        self._base[4:12] = struct.pack('II', alloc_pos, used_pages)
+        memcopy(self._base[4:12],
+                struct.pack(str('II'), alloc_pos, used_pages))
 
     def set_page_status(self, start, page_num, status):
         """ set pages from 'start' to 'end' with new same status 'status'
@@ -253,14 +290,14 @@ class PageAllocator(object):
         end = start + page_num
         assert start >= 0 and end <= self._header_size, 'invalid end[%d] of pages '\
             'in allocator[%s]' % (end, str(self))
-        self._base[start:end] = status * page_num
+        memcopy(self._base[start:end], str(status * page_num))
 
     def get_page_status(self, start, page_num, ret_flag=False):
         start += self.s_allocator_header
         end = start + page_num
         assert start >= 0 and end <= self._header_size, 'invalid end[%d] of pages '\
             'in allocator[%s]' % (end, str(self))
-        status = self._base[start:end]
+        status = self._base[start:end].tostring().decode()
         if ret_flag:
             return status
 
@@ -286,7 +323,6 @@ class PageAllocator(object):
                 pos, page_num - len(flags), ret_flag=True)
 
             if flags.count('0') == page_num:
-                logger.debug('found available pages at pos[%d]' % (pos))
                 break
 
             # not found enough pages, so shift to next few pages
@@ -378,7 +414,7 @@ class SharedMemoryMgr(object):
         assert self._cap % self._page_size == 0, \
             "capacity[%d] and pagesize[%d] are not consistent" \
             % (self._cap, self._page_size)
-        self._total_pages = int(self._cap / self._page_size)
+        self._total_pages = self._cap // self._page_size
 
         self._pid = os.getpid()
         SharedMemoryMgr.s_mgr_num += 1
@@ -389,10 +425,12 @@ class SharedMemoryMgr(object):
 
     def _setup(self):
         self._shared_mem = RawArray('c', self._cap)
+        self._base = np.frombuffer(
+            self._shared_mem, dtype='uint8', count=self._cap)
         self._locker.acquire()
         try:
-            self._allocator = PageAllocator(self._shared_mem,
-                                            self._total_pages, self._page_size)
+            self._allocator = PageAllocator(self._base, self._total_pages,
+                                            self._page_size)
         finally:
             self._locker.release()
 
@@ -400,8 +438,8 @@ class SharedMemoryMgr(object):
         """ malloc a new SharedBuffer
 
         Args:
-            @size (int): buffer size to be malloc
-            @wait (bool): whether to wait when no enough memory
+            size (int): buffer size to be malloc
+            wait (bool): whether to wait when no enough memory
 
         Returns:
             SharedBuffer
@@ -409,7 +447,7 @@ class SharedMemoryMgr(object):
         Raises:
             SharedMemoryError when not found available memory
         """
-        page_num = int(math.ceil(float(size) / self._page_size))
+        page_num = int(math.ceil(size / self._page_size))
         size = page_num * self._page_size
 
         start = None
@@ -443,22 +481,19 @@ class SharedMemoryMgr(object):
         """ free a SharedBuffer
 
         Args:
-            @shared_buf (SharedBuffer): buffer to be freed
+            shared_buf (SharedBuffer): buffer to be freed
 
         Returns:
             None
 
         Raises:
-            SharedMemoryError when failed to free
+            SharedMemoryError when failed to release this buffer
         """
         assert shared_buf._owner == self._id, "invalid shared_buf[%s] "\
             "for it's not allocated from me[%s]" % (str(shared_buf), str(self))
         cap = shared_buf.capacity()
         start_page = shared_buf._pos
-
-        page_num = cap / self._page_size
-        assert page_num * self._page_size == cap, "invalid capacity "\
-            "of shared_buf[%s] when free it" % (str(shared_buf))
+        page_num = cap // self._page_size
 
         #maybe we don't need this lock here
         self._locker.acquire()
@@ -476,19 +511,17 @@ class SharedMemoryMgr(object):
         end = start + len(data)
         assert start >= 0 and end <= self._cap, "invalid start "\
             "position[%d] when put data to buff:%s" % (start, str(shared_buf))
-        self._shared_mem[start:end] = data
+        self._base[start:end] = np.frombuffer(data, 'uint8', len(data))
 
-    def get_data(self, shared_buf, offset, size):
+    def get_data(self, shared_buf, offset, size, no_copy=True):
         """ extract 'data' from 'shared_buf' in range [offset, offset + size)
         """
         start = shared_buf._pos * self._page_size
         start += offset
-        return self._shared_mem[start:start + size]
-
-    def release(self):
-        """ called when all processes will not use this memory in future
-        """
-        self._released = True
+        if no_copy:
+            return self._base[start:start + size]
+        else:
+            return self._base[start:start + size].tostring()
 
     def __str__(self):
         return 'SharedMemoryMgr:{id:%d, %s}' % (self._id, str(self._allocator))
@@ -500,7 +533,9 @@ class SharedMemoryMgr(object):
         if not self._released and not self._allocator.empty():
             logger.warn('not empty when delete this SharedMemoryMgr[%s]' %
                         (self))
+        else:
+            self._released = True
 
         if self._id in SharedMemoryMgr.s_memory_mgrs:
-            del SharedMemoryMgr.s_memory_mgrs[mgr._id]
+            del SharedMemoryMgr.s_memory_mgrs[self._id]
             SharedMemoryMgr.s_mgr_num -= 1

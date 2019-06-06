@@ -59,14 +59,14 @@ class TestSharedQueue(unittest.TestCase):
             bufs.append(buf)
 
         for i, bf in enumerate(bufs):
-            self.assertEqual(bf.get(), 'hello_%d' % (i))
+            self.assertEqual(bf.get(no_copy=False), 'hello_%d' % (i))
 
         bufs[1].free()
         bufs[1] = mgr.malloc(10)
         bufs[1].put('hello_1')
 
         for i, bf in enumerate(bufs):
-            self.assertEqual(bf.get(), 'hello_%d' % (i))
+            self.assertEqual(bf.get(no_copy=False), 'hello_%d' % (i))
             bf.free()
 
     def test_sharedqueue(self):
