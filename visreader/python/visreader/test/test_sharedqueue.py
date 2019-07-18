@@ -130,7 +130,7 @@ class TestSharedQueue(unittest.TestCase):
             ct += 1
             if i % 1000 == 0:
                 self.assertEqual(np.sum(data[0]), expect_sum)
-                print('get sample_%d from subprocess: %s' % (i, data[1]))
+                #print('get sample_%d from subprocess: %s' % (i, data[1]))
 
         for i in range(worker_num):
             inqueue.put(end)

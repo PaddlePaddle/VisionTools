@@ -38,8 +38,8 @@ def run_ops(op_list, img):
     return img
 
 
-class TestOps(unittest.TestCase):
-    """Test cases for shared_memory.fast_xmap
+class TestOperators(unittest.TestCase):
+    """Test cases for visreader.operators
     """
 
     @classmethod

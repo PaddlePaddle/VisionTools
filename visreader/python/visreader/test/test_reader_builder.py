@@ -29,10 +29,11 @@ class TestReaderBuilder(unittest.TestCase):
     def setUpClass(cls):
         """ setup
         """
-        cls.uri = 'file:/' + os.path.abspath(__file__)
         work_dir = os.path.dirname(os.path.realpath(__file__))
-        train_uri = os.path.join(work_dir, '../../../tests/data/seqfile')
-        val_uri = os.path.join(work_dir, '../../../tests/data/seqfile')
+        train_uri = os.path.join(
+            work_dir, '../../../tests/data/seqfile/imagenet.train.seqfile')
+        val_uri = os.path.join(
+            work_dir, '../../../tests/data/seqfile/imagenet.val.seqfile')
         cls.uris = {'train': train_uri, 'val': val_uri}
 
     @classmethod
@@ -41,6 +42,15 @@ class TestReaderBuilder(unittest.TestCase):
         pass
 
     def test_reader(self):
+        """ test reader
+        """
+        train_uri = self.uris['train']
+        val_uri = self.uris['val']
+        if not os.path.exists(train_uri) or not os.path.exists(val_uri):
+            print('warn:not found data file for [%s] or [%s]' %
+                  (train_uri, val_uri))
+            return
+
         pl_setting = {'sample_parser': _parse_kv}
         train_setting = ReaderSetting(
             self.uris['train'],
