@@ -27,6 +27,7 @@ from multiprocessing.util import Finalize
 from Queue import Queue
 import itertools
 import random
+import copy
 import zlib
 
 import logging
@@ -113,6 +114,7 @@ def shuffle(reader, buf_size):
                 else:
                     stopped = True
                     if buf:
+                        random.shuffle(buf)
                         yield_buf += buf
                         buf = []
 
@@ -123,6 +125,86 @@ def shuffle(reader, buf_size):
                 break
 
     return _reader
+
+
+def echo(reader, times, size=0, copy_func=None):
+    """
+    Repeat samples for several times specified by 'times',
+    and then shuffle them in a range specified by 'size',
+    reffered paper: `Faster Neural Network Training with Data Echoing`
+
+    :param reader: the original reader whose output will be echoed.
+    :type reader: callable
+    :param times: replayed times for each sample
+    :type size: int
+    :param size: buffer size to shuffle
+    :type size: int
+    :param copy_func: function to copy data when echoing
+    :type copy_func: callable
+    :return: the new reader whose output is echoed.
+    :rtype: callable
+    """
+
+    assert times > 0, "invalid param of times[%d] to echo" % (times)
+
+    copy_func = copy.deepcopy if copy_func is None else copy_func
+
+    def _no_shuffle_reader():
+        for sample in reader():
+            for _ in range(times):
+                yield copy_func(sample)
+
+    def _next(iter):
+        try:
+            ret = next(iter)
+        except StopIteration as e:
+            ret = e
+
+        return ret
+
+    def _reader():
+        data_gen = reader()
+        sample_buf = []
+        no_more_data = False
+        # fill buffer with 'size' samples
+        while len(sample_buf) < size:
+            sample = _next(data_gen)
+            if isinstance(sample, StopIteration):
+                no_more_data = True
+                break
+            else:
+                sample_buf.append([0, sample])
+
+        # sample from this buffer at most 'times' for each sample
+
+        pos = 0
+        index = list(range(len(sample_buf)))
+        while len(sample_buf) > 0:
+            pos = (pos + 1) % len(index)
+            if pos == len(index):
+                index = list(range(len(sample_buf)))
+                random.shuffle(index)
+
+            which = index[pos] % len(sample_buf)
+            sample = sample_buf[which]
+            sample[0] += 1
+            yield copy_func(sample[1])
+
+            if sample[0] >= times:
+                sample_buf[which] = None
+                if not no_more_data:
+                    sample = _next(data_gen)
+                    if isinstance(sample, StopIteration):
+                        no_more_data = True
+                    else:
+                        sample_buf[which] = [0, sample]
+                if sample_buf[which] is None:
+                    sample_buf.remove(sample_buf[which])
+
+    if size > 0:
+        return _reader
+    else:
+        return _no_shuffle_reader
 
 
 def chain(*readers):
@@ -310,6 +392,10 @@ class XMappedReader(object):
 
         assert buffer_size > 0, "invalid buffer_size[%d] in XMappedReader" \
             % (buffer_size)
+
+        if buffer_size < worker_num:
+            buffer_size = worker_num
+
         if pre_feed is None:
             pre_feed = 1 + buffer_size / 2
 
@@ -393,6 +479,8 @@ class XMappedReader(object):
                     assert id not in fetch_ctx['results'], \
                         "duplicated id[%d] in order mode" % (id)
                     fetch_ctx['results'][id] = sample
+
+                    id = fetch_ctx['id']
                     if id in fetch_ctx['results']:
                         sample = fetch_ctx['results'][id]
                         del fetch_ctx['results'][id]
@@ -421,6 +509,7 @@ class XMappedReader(object):
                     sample, id = result
                     assert id not in fetch_ctx['results'], \
                         "duplicated id[%d] in order mode" % (id)
+                    fetch_ctx['results'][id] = sample
         while len(fetch_ctx['results'].keys()) > 0:
             id = fetch_ctx['id']
             if id in fetch_ctx['results']:

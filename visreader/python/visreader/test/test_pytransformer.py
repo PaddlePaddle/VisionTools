@@ -44,7 +44,7 @@ lua_ops = {
 
 
 class TestPyTransformer(unittest.TestCase):
-    """Test cases for shared_memory.fast_xmap
+    """Test cases for visreader.transformer.pytransformer
     """
 
     @classmethod

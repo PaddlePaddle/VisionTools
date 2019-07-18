@@ -216,6 +216,29 @@ class Pipeline(object):
 
         return self
 
+    def echo(self, times, size=0, copy_func=None):
+        """ Echo samples for 'times' with a shuffle size 'size',
+            reffered paper: `Faster Neural Network Training with Data Echoing`
+
+        Args:
+            times (int): times to echo for each sample from upstream
+            size (int): size of buffer for shuffling, <= 0 means no shuffle
+
+        Returns:
+            self
+
+        Raises:
+            None
+        """
+        assert times > 0, "invalid param of times[%d] for echo" % (times)
+        self._pipeline.append(('echo', {
+            'size': size,
+            'times': times,
+            'copy_func': copy_func
+        }))
+
+        return self
+
     def batch(self, size, drop=False):
         """ make batches from data items
 
@@ -308,7 +331,7 @@ class Pipeline(object):
                 'invalid param for "funcs", not a function or a list of functions'
             )
 
-        self._pipeline.append(('xmap', {'func': f, 'process_num': process_num, \
+        self._pipeline.append(('xmap', {'func': f, 'worker_num': process_num, \
                 'buffer_size': buffer_size, 'order': order, 'use_process': use_process}))
 
         return self
@@ -366,6 +389,9 @@ class Pipeline(object):
                 rd = cache_reader(rd, param['where'])
             elif op_name == 'shuffle':
                 rd = decorator.shuffle(rd, param['size'])
+            elif op_name == 'echo':
+                rd = decorator.echo(rd, param['times'], param['size'],
+                                    param['copy_func'])
             elif op_name == 'batch':
                 rd = _batch(rd, param['size'], param['drop'])
             elif op_name == 'map':
@@ -378,7 +404,7 @@ class Pipeline(object):
             elif op_name == 'xmap':
                 xmapper = decorator.Xmap(
                     mapper=param['func'],
-                    process_num=param['process_num'],
+                    worker_num=param['worker_num'],
                     buffer_size=param['buffer_size'],
                     order=param['order'],
                     use_process=param['use_process'])
@@ -442,18 +468,5 @@ class Pipeline(object):
             id += 1
         return '\n  '.join(ops)
 
-
-if __name__ == "__main__":
-    """ test
-    """
-
-    def _data_reader():
-        for i in xrange(11):
-            yield i
-
-    p = Pipeline(_data_reader)
-    rd = p.xmap(lambda r: 2 * r, 2, 2).shuffle(4).batch(2).reader()
-    for i in rd():
-        print i
 
 #/* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
